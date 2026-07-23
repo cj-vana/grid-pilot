@@ -45,9 +45,9 @@ final class LearnController {
 
     func handle(_ event: MIDIEvent) {
         guard let control = currentControl else { return }
-        let key = ControlKey(type: event.type, number: event.number)
+        let key = ControlKey(type: event.type, number: event.number, channel: event.channel)
         // A control captured for an earlier step can't also be this one.
-        guard !captured.values.contains(where: { $0.cc == key.number && $0.type == key.type }) else { return }
+        guard !captured.values.contains(where: { $0.matches(event) }) else { return }
 
         let isButtonStep = control.hasPrefix("B")
         valuesSeen[key, default: []].insert(event.value)
@@ -65,7 +65,7 @@ final class LearnController {
     }
 
     private func capture(control: String, key: ControlKey, kind: ControlKind) {
-        captured[control] = ControlDef(cc: key.number, kind: kind, type: key.type)
+        captured[control] = ControlDef(cc: key.number, kind: kind, type: key.type, channel: key.channel)
         valuesSeen = [:]
         sawHigh = []
         stepIndex += 1

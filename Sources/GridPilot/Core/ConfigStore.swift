@@ -88,6 +88,51 @@ final class ConfigStore {
         return urls.filter { $0.pathExtension == "json" }.sorted { $0.lastPathComponent > $1.lastPathComponent }
     }
 
+    // MARK: Presets — named full-config snapshots, switchable from the menu.
+
+    var presetsDir: URL { path.deletingLastPathComponent().appendingPathComponent("presets") }
+
+    func presets() -> [String] {
+        let urls = (try? FileManager.default.contentsOfDirectory(at: presetsDir, includingPropertiesForKeys: nil)) ?? []
+        return urls.filter { $0.pathExtension == "json" }
+            .map { $0.deletingPathExtension().lastPathComponent }
+            .sorted()
+    }
+
+    func savePreset(named name: String) throws {
+        let safe = Self.presetFileName(name)
+        guard !safe.isEmpty else {
+            throw NSError(domain: "GridPilot", code: 3, userInfo: [NSLocalizedDescriptionKey: "preset name is empty"])
+        }
+        try FileManager.default.createDirectory(at: presetsDir, withIntermediateDirectories: true)
+        try config.encodePretty().write(to: presetsDir.appendingPathComponent("\(safe).json"))
+        Log.info("preset saved: \(safe)")
+    }
+
+    func loadPreset(named name: String) throws {
+        let url = presetsDir.appendingPathComponent("\(Self.presetFileName(name)).json")
+        let preset = try Config.decode(Data(contentsOf: url))
+        try apply(preset, backup: true)
+        Log.info("preset loaded: \(name)")
+    }
+
+    /// Name of the preset identical to the live config, for the menu checkmark.
+    func presetMatchingCurrent() -> String? {
+        for name in presets() {
+            let url = presetsDir.appendingPathComponent("\(name).json")
+            if let data = try? Data(contentsOf: url), let preset = try? Config.decode(data), preset == config {
+                return name
+            }
+        }
+        return nil
+    }
+
+    static func presetFileName(_ name: String) -> String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+    }
+
     func startWatching() {
         stopWatching()
         watchedDescriptor = open(path.path, O_EVTONLY)

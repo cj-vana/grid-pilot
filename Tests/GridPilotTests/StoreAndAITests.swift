@@ -205,3 +205,67 @@ final class AITests: XCTestCase {
         XCTAssertEqual(AICustomizer.extractJSON(raw), "{\"key\": \"va}lue\", \"n\": {\"x\": 1}}")
     }
 }
+
+final class PresetTests: XCTestCase {
+    var dir: URL!
+    var store: ConfigStore!
+
+    override func setUp() {
+        super.setUp()
+        dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("gridpilot-preset-tests-\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        store = ConfigStore(path: dir.appendingPathComponent("config.json"))
+        store.loadOrCreate()
+    }
+
+    override func tearDown() {
+        try? FileManager.default.removeItem(at: dir)
+        super.tearDown()
+    }
+
+    func testSaveListLoadRoundTrip() throws {
+        try store.savePreset(named: "Coding")
+        var changed = Config.default
+        changed.longPressMs = 900
+        try store.apply(changed, backup: false)
+        try store.savePreset(named: "Music")
+
+        XCTAssertEqual(store.presets(), ["Coding", "Music"])
+        XCTAssertEqual(store.presetMatchingCurrent(), "Music")
+
+        try store.loadPreset(named: "Coding")
+        XCTAssertEqual(store.config.longPressMs, 400)
+        XCTAssertEqual(store.presetMatchingCurrent(), "Coding")
+        XCTAssertFalse(store.backups().isEmpty, "loading a preset backs up the previous config")
+    }
+
+    func testEmptyPresetNameRejected() {
+        XCTAssertThrowsError(try store.savePreset(named: "  "))
+    }
+}
+
+final class ChannelRoutingTests: XCTestCase {
+    func testSameNumberDifferentChannelRoutesToDistinctControls() {
+        var config = Config.default
+        // Simulate a chained module: same CC 32, channel 12, mapped elsewhere.
+        config.controls["P1"]?.channel = 0
+        config.controls["M2.P1"] = ControlDef(cc: 32, kind: .continuous, type: .cc, channel: 12)
+        config.mappings["M2.P1"] = Mapping(action: ActionSpec(action: "alertVolume"))
+        let time = FakeTime()
+        let sink = SpySink()
+        let engine = MappingEngine(config: config, sink: sink, now: time.now, schedule: time.schedule)
+
+        engine.handle(MIDIEvent(type: .cc, number: 32, value: 127, channel: 0))
+        engine.handle(MIDIEvent(type: .cc, number: 32, value: 127, channel: 12))
+        XCTAssertEqual(sink.calls.map(\.action), ["displayBrightness", "alertVolume"])
+    }
+
+    func testWildcardChannelStillMatchesAnything() {
+        let time = FakeTime()
+        let sink = SpySink()
+        let engine = MappingEngine(config: .default, sink: sink, now: time.now, schedule: time.schedule)
+        engine.handle(MIDIEvent(type: .cc, number: 36, value: 127, channel: 7))
+        XCTAssertEqual(sink.calls.map(\.action), ["spotifyVolume"])
+    }
+}

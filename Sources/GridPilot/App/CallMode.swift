@@ -58,8 +58,7 @@ final class CallModeController {
         guard active else { return false }
         let controls = store.config.controls
         func matches(_ name: String) -> Bool {
-            guard let control = controls[name] else { return false }
-            return control.cc == event.number && control.type == event.type
+            controls[name]?.matches(event) ?? false
         }
         if matches("B1") {
             if event.value >= 64 { answer() }

@@ -29,10 +29,12 @@ enum AIPrompt {
         - `version`: must be 1.
         - `midi`: `{ "deviceName": string, "channel": int|null }` — null channel = any.
         - `longPressMs`: 100-2000, button hold threshold.
-        - `controls`: map of control name → `{ "cc": 0-127, "kind": "continuous"|"button", "type": "cc"|"note" }`.
+        - `controls`: map of control name → `{ "cc": 0-127, "kind": "continuous"|"button", "type": "cc"|"note", "channel": 0-15|null }`.
           `cc` is the CC or note number; `type` says which (Grid buttons send notes).
-          type+number pairs must be unique. Do not change these unless asked — they
-          were captured from the physical device by learn mode.
+          `channel` null matches any channel; chained Grid modules reuse numbers on
+          different channels, so multi-module controls set it. type+number+channel
+          must be unique. Do not change these unless asked — they were captured from
+          the physical device by learn mode.
         - `mappings`: map of control name → mapping.
           Continuous controls: `{ "action": ActionSpec }`.
           Buttons: `{ "tap": ActionSpec?, "longPress": ActionSpec? }` (at least one).

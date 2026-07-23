@@ -67,11 +67,16 @@ struct ControlDef: Codable, Equatable {
     var cc: Int
     var kind: ControlKind
     var type: MIDIMessageType
+    /// MIDI channel this control sends on; nil matches any channel. Chained
+    /// Grid modules reuse the same CC numbers on different channels
+    /// (channel = moduleY*4 + page), so multi-module setups need this set.
+    var channel: Int?
 
-    init(cc: Int, kind: ControlKind, type: MIDIMessageType = .cc) {
+    init(cc: Int, kind: ControlKind, type: MIDIMessageType = .cc, channel: Int? = nil) {
         self.cc = cc
         self.kind = kind
         self.type = type
+        self.channel = channel
     }
 
     init(from decoder: Decoder) throws {
@@ -80,12 +85,19 @@ struct ControlDef: Codable, Equatable {
         kind = try container.decode(ControlKind.self, forKey: .kind)
         // Configs written before note support have no `type`; they were all CC.
         type = try container.decodeIfPresent(MIDIMessageType.self, forKey: .type) ?? .cc
+        channel = try container.decodeIfPresent(Int.self, forKey: .channel)
+    }
+
+    func matches(_ event: MIDIEvent) -> Bool {
+        cc == event.number && type == event.type && (channel == nil || channel == event.channel)
     }
 }
 
 struct ControlKey: Hashable {
     var type: MIDIMessageType
     var number: Int
+    /// nil acts as a wildcard slot; engine lookups try exact channel first.
+    var channel: Int?
 }
 
 struct Mapping: Codable, Equatable {

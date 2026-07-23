@@ -145,6 +145,23 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
         menu.setSubmenu(themeMenu, for: theme)
         menu.addItem(theme)
+
+        let presets = NSMenuItem(title: "Presets", action: nil, keyEquivalent: "")
+        let presetsMenu = NSMenu()
+        let active = store.presetMatchingCurrent()
+        for name in store.presets() {
+            let entry = NSMenuItem(title: name, action: #selector(loadPreset(_:)), keyEquivalent: "")
+            entry.target = self
+            entry.representedObject = name
+            entry.state = name == active ? .on : .off
+            presetsMenu.addItem(entry)
+        }
+        if !presetsMenu.items.isEmpty { presetsMenu.addItem(.separator()) }
+        let saveAs = NSMenuItem(title: "Save Current As…", action: #selector(savePresetAs), keyEquivalent: "")
+        saveAs.target = self
+        presetsMenu.addItem(saveAs)
+        menu.setSubmenu(presetsMenu, for: presets)
+        menu.addItem(presets)
         menu.addItem(.separator())
 
         menu.addItem(item("Learn Controls…", #selector(startLearn), key: ""))
@@ -256,6 +273,33 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     @objc private func setLEDTheme(_ sender: NSMenuItem) {
         appDelegate?.setLEDTheme(sender.tag)
+    }
+
+    @objc private func loadPreset(_ sender: NSMenuItem) {
+        guard let name = sender.representedObject as? String else { return }
+        do {
+            try store.loadPreset(named: name)
+        } catch {
+            Log.error("preset load failed: \(error.localizedDescription)")
+        }
+    }
+
+    @objc private func savePresetAs() {
+        let alert = NSAlert()
+        alert.messageText = "Save current config as preset"
+        alert.informativeText = "Shows up in the Presets menu; loading one swaps the whole mapping."
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        field.placeholderString = "e.g. Coding, Music, Streaming"
+        alert.accessoryView = field
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        do {
+            try store.savePreset(named: field.stringValue)
+        } catch {
+            Log.error("preset save failed: \(error.localizedDescription)")
+        }
     }
 
     @objc private func promptModel(_ sender: NSMenuItem) {

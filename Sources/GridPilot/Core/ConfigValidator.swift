@@ -18,7 +18,10 @@ enum ConfigValidator {
             if control.cc < 0 || control.cc > 127 {
                 problems.append("Control \(name): \(control.type.rawValue) number \(control.cc) out of range 0...127.")
             }
-            let key = ControlKey(type: control.type, number: control.cc)
+            if let channel = control.channel, channel < 0 || channel > 15 {
+                problems.append("Control \(name): channel \(channel) out of range 0...15.")
+            }
+            let key = ControlKey(type: control.type, number: control.cc, channel: control.channel)
             if let existing = seenKeys[key] {
                 problems.append("Control \(name): \(control.type.rawValue) \(control.cc) already used by \(existing).")
             } else {

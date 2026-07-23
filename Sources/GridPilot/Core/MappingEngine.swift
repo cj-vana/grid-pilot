@@ -40,8 +40,13 @@ final class MappingEngine {
 
     func handle(_ event: MIDIEvent) {
         if let expected = config.midi.channel, expected != event.channel { return }
-        let key = ControlKey(type: event.type, number: event.number)
-        guard let (name, control) = byKey[key], let mapping = config.mappings[name] else { return }
+        // Exact channel match wins (multi-module chains reuse numbers across
+        // channels); channel-less definitions act as wildcards.
+        let exact = ControlKey(type: event.type, number: event.number, channel: event.channel)
+        let wildcard = ControlKey(type: event.type, number: event.number, channel: nil)
+        guard let (name, control) = byKey[exact] ?? byKey[wildcard],
+              let mapping = config.mappings[name] else { return }
+        let key = ControlKey(type: control.type, number: control.cc, channel: control.channel)
 
         switch control.kind {
         case .continuous:
@@ -59,7 +64,7 @@ final class MappingEngine {
     private func rebuild() {
         byKey = [:]
         for (name, control) in config.controls {
-            byKey[ControlKey(type: control.type, number: control.cc)] = (name, control)
+            byKey[ControlKey(type: control.type, number: control.cc, channel: control.channel)] = (name, control)
         }
         // Drop stale per-control state so remapped controls start clean.
         coalescers = [:]

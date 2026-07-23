@@ -22,6 +22,8 @@ enum CLI {
             return 0
         case "rollback":
             return rollback()
+        case "preset":
+            return preset(arguments: Array(arguments.dropFirst()))
         case "version":
             print("gridpilot \(appVersion)")
             return 0
@@ -35,6 +37,7 @@ enum CLI {
               gridpilot notify --event <name>   ping the running app (flashes icon, sends LED MIDI)
                                         events: anything, plus call:<bundleid> / call-end
               gridpilot rollback        restore the most recent config backup
+              gridpilot preset list|save <name>|load <name>   named config snapshots
               gridpilot doctor          check device, permissions, and AI CLIs
               gridpilot schema          print the config schema the AI sees
               gridpilot config-path     print the config file location
@@ -106,6 +109,45 @@ enum CLI {
         )
         print("sent \(event)")
         return 0
+    }
+
+    private static func preset(arguments: [String]) -> Int32 {
+        let store = ConfigStore()
+        store.loadOrCreate()
+        switch arguments.first {
+        case "list", nil:
+            let names = store.presets()
+            if names.isEmpty {
+                print("no presets — save one with: gridpilot preset save <name>")
+            } else {
+                let active = store.presetMatchingCurrent()
+                for name in names { print("\(name == active ? "* " : "  ")\(name)") }
+            }
+            return 0
+        case "save":
+            guard arguments.count > 1 else { print("usage: gridpilot preset save <name>"); return 64 }
+            do {
+                try store.savePreset(named: arguments.dropFirst().joined(separator: " "))
+                print("✓ saved")
+                return 0
+            } catch {
+                print("✗ \(error.localizedDescription)")
+                return 1
+            }
+        case "load":
+            guard arguments.count > 1 else { print("usage: gridpilot preset load <name>"); return 64 }
+            do {
+                try store.loadPreset(named: arguments.dropFirst().joined(separator: " "))
+                print("✓ loaded — running app hot-reloads automatically")
+                return 0
+            } catch {
+                print("✗ \(error.localizedDescription)")
+                return 1
+            }
+        default:
+            print("usage: gridpilot preset list|save <name>|load <name>")
+            return 64
+        }
     }
 
     private static func rollback() -> Int32 {
