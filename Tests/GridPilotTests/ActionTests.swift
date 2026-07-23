@@ -154,3 +154,12 @@ final class RegistryTests: XCTestCase {
         XCTAssertEqual(sentMIDI[0].2, 0)
     }
 }
+
+final class MenuLabelTests: XCTestCase {
+    func testFriendlyLabelsAndGenericFallbacks() {
+        XCTAssertEqual(MenuBarController.label(for: ActionSpec(action: "spotifyPlayPause")), "Spotify play/pause")
+        XCTAssertEqual(MenuBarController.label(for: ActionSpec(action: "shell", params: ["command": .string("open -a Slack")])), "shell: open -a Slack")
+        XCTAssertEqual(MenuBarController.label(for: ActionSpec(action: "keystroke", params: ["keyCode": .number(53)])), "keystroke 53")
+        XCTAssertEqual(MenuBarController.label(for: ActionSpec(action: "somethingNew")), "somethingNew")
+    }
+}

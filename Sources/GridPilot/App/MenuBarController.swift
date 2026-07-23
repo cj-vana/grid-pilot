@@ -81,6 +81,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(status)
         menu.addItem(.separator())
 
+        for row in mappingRows() {
+            let item = NSMenuItem(title: row, action: nil, keyEquivalent: "")
+            item.isEnabled = false
+            menu.addItem(item)
+        }
+        menu.addItem(.separator())
+
         let pause = NSMenuItem(
             title: appDelegate?.isPaused == true ? "Resume" : "Pause",
             action: #selector(togglePause), keyEquivalent: "p"
@@ -116,6 +123,60 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(login)
         menu.addItem(.separator())
         menu.addItem(item("Quit GridPilot", #selector(quit), key: "q"))
+    }
+
+    /// One glanceable line per control, straight from the live config.
+    private func mappingRows() -> [String] {
+        let config = store.config
+        return Config.controlNames.compactMap { name in
+            guard let mapping = config.mappings[name] else { return "\(name)   —" }
+            if let action = mapping.action {
+                return "\(name)   \(Self.label(for: action))"
+            }
+            var parts: [String] = []
+            if let tap = mapping.tap { parts.append(Self.label(for: tap)) }
+            if let hold = mapping.longPress { parts.append("hold: \(Self.label(for: hold))") }
+            return "\(name)   \(parts.isEmpty ? "—" : parts.joined(separator: "  ·  "))"
+        }
+    }
+
+    private static let friendlyNames: [String: String] = [
+        "displayBrightness": "Display brightness",
+        "micVolume": "Mic volume",
+        "systemVolume": "System volume",
+        "alertVolume": "Alert volume",
+        "spotifyVolume": "Spotify volume",
+        "nightShiftWarmth": "Night Shift warmth",
+        "itermTabPicker": "iTerm tab picker",
+        "outputDeviceDial": "Output device dial",
+        "contextEscape": "Interrupt (Esc to iTerm/ChatGPT)",
+        "newClaudeSession": "New Claude session",
+        "newCodexSession": "New Codex session",
+        "screenshotRegion": "Screenshot region → clipboard",
+        "screenshotFull": "Screenshot full → clipboard",
+        "spotifyPlayPause": "Spotify play/pause",
+        "spotifyNextTrack": "Spotify next track",
+    ]
+
+    static func label(for spec: ActionSpec) -> String {
+        if let friendly = friendlyNames[spec.action] { return friendly }
+        switch spec.action {
+        case "shell":
+            return "shell: \(snip(spec.string("command")))"
+        case "applescript":
+            return "AppleScript: \(snip(spec.string("source")))"
+        case "keystroke":
+            return "keystroke \(spec.number("keyCode").map { String(Int($0)) } ?? "?")"
+        case "midiSend":
+            return "MIDI out cc\(spec.number("cc").map { String(Int($0)) } ?? "?")"
+        default:
+            return spec.action
+        }
+    }
+
+    private static func snip(_ text: String?) -> String {
+        guard let text = text?.replacingOccurrences(of: "\n", with: " ") else { return "?" }
+        return text.count > 32 ? String(text.prefix(32)) + "…" : text
     }
 
     private func providerLabel(_ name: String) -> String {
