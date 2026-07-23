@@ -37,20 +37,27 @@ open the **Setup** event, replace the code block's contents with the snippet
 below, Commit, then click **Store** so it survives power cycles.
 
 ```lua
--- Theme palettes: {min, mid, max} RGB anchors, indexed by CC 20's value + 1.
-self.T={{{0,60,255},{170,0,255},{255,30,0}},{{0,10,80},{0,190,190},{200,255,255}},{{80,0,160},{255,0,120},{255,150,0}},{{0,20,0},{0,180,30},{120,255,80}},{{20,0,0},{255,60,0},{255,220,0}},{{10,10,10},{120,120,120},{255,255,255}}}
+-- Theme palettes: flat {minR,minG,minB, midR,midG,midB, maxR,maxG,maxB},
+-- indexed by CC 20's value + 1.
+self.T={{0,60,255,170,0,255,255,30,0},{0,10,80,0,190,190,200,255,255},{80,0,160,255,0,120,255,150,0},{0,20,0,0,180,30,120,255,80},{20,0,0,255,60,0,255,220,0},{10,10,10,120,120,120,255,255,255}}
 -- Last seen value per element, so theme switches keep true LED levels.
 self.q={}
+-- F interpolates one color channel (o = 1/2/3) at value v across the anchors,
+-- matching the firmware's min→mid→max rendering. Needed because palette writes
+-- repaint the LED with the last anchor written; on a theme switch we compute
+-- and set the true current color ourselves.
+self.F=function(t,v,o) local a,b,f if v<64 then a=o b=o+3 f=v*2 else a=o+3 b=o+6 f=(v-64)*2 end return t[a]+((t[b]-t[a])*f)//127 end
 self.midirx_cb=function(s,h,e)
   local c,m,p,v=e[1],e[2],e[3],e[4]
   if c==15 and m==176 and p==20 then
     local t=s.T[v+1] or s.T[1]
     for n=0,11 do
-      gln(n,1,t[1][1],t[1][2],t[1][3])
-      gld(n,1,t[2][1],t[2][2],t[2][3])
-      glx(n,1,t[3][1],t[3][2],t[3][3])
-      local x=(s.q[n] or 0)*2 if x>254 then x=254 end
-      glp(n,1,x)
+      gln(n,1,t[1],t[2],t[3])
+      gld(n,1,t[4],t[5],t[6])
+      glx(n,1,t[7],t[8],t[9])
+      local q=s.q[n] or 0
+      glc(n,1,s.F(t,q,1),s.F(t,q,2),s.F(t,q,3))
+      glp(n,1,q*2)
     end
     return
   end
@@ -62,8 +69,7 @@ self.midirx_cb=function(s,h,e)
   end
   if n>=0 then
     s.q[n]=v
-    local x=v*2 if x>254 then x=254 end
-    glp(n,1,x)
+    glp(n,1,v*2)
   end
 end
 ```
