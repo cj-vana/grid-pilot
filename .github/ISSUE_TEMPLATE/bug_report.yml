@@ -1,0 +1,35 @@
+name: Bug report
+description: Something broken in GridPilot
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What did you do, what did you expect, what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: gridpilot doctor output
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "e.g. 26.4"
+    validations:
+      required: true
+  - type: input
+    id: module
+    attributes:
+      label: Grid module
+      placeholder: "e.g. PBF4, EF44, chained PBF4+BU16"
+  - type: textarea
+    id: log
+    attributes:
+      label: Relevant lines from ~/Library/Logs/GridPilot.log
+      render: text
