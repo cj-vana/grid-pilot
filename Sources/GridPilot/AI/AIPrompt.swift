@@ -40,6 +40,10 @@ enum AIPrompt {
           CCs sent to the Grid when `gridpilot notify` fires (LED feedback).
         - `contextKeys`: action name → bundle id → `{ "keyCode": int, "modifiers": [string]? }`.
           Used by context-aware actions; apps not listed are no-ops.
+        - `call` (optional): incoming-call mode. `{ "enabled": bool, "ringTimeoutSec": int,
+          "flashLEDs": bool, "apps": { bundleId: { "name": string, "answerKey": KeySpec|null } } }`.
+          While a configured app rings, B1 answers (activates the app, sends answerKey if set)
+          and B2 silences the ring by muting output; both revert automatically.
 
         ActionSpec: `{ "action": string, "params": object? }`.
 

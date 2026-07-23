@@ -112,6 +112,38 @@ struct KeySpec: Codable, Equatable {
     var modifiers: [String]?
 }
 
+struct CallAppConfig: Codable, Equatable {
+    var name: String
+    /// Keystroke sent (after activating the app) when B1 answers. nil = just
+    /// bring the app forward and let the user click.
+    var answerKey: KeySpec?
+}
+
+struct CallConfig: Codable, Equatable {
+    var enabled: Bool
+    /// Call mode auto-expires after this long if nobody touches it.
+    var ringTimeoutSec: Int
+    /// Blink the button LEDs (via MIDI back to the Grid) while ringing.
+    var flashLEDs: Bool
+    /// bundle id → per-app call settings; only these apps trigger call mode.
+    var apps: [String: CallAppConfig]
+
+    static var standard: CallConfig {
+        CallConfig(
+            enabled: true,
+            ringTimeoutSec: 45,
+            flashLEDs: true,
+            apps: [
+                "com.apple.FaceTime": CallAppConfig(name: "FaceTime", answerKey: nil),
+                "com.microsoft.teams2": CallAppConfig(name: "Microsoft Teams", answerKey: KeySpec(keyCode: 0, modifiers: ["cmd", "shift"])),
+                "us.zoom.xos": CallAppConfig(name: "Zoom", answerKey: nil),
+                "com.hnc.Discord": CallAppConfig(name: "Discord", answerKey: nil),
+                "com.tinyspeck.slackmacgap": CallAppConfig(name: "Slack", answerKey: nil),
+            ]
+        )
+    }
+}
+
 struct Config: Codable, Equatable {
     var version: Int
     var midi: MIDIConfig
@@ -122,6 +154,8 @@ struct Config: Codable, Equatable {
     var notify: NotifyConfig
     /// action name → frontmost bundle id → key to send. Apps not listed = no-op.
     var contextKeys: [String: [String: KeySpec]]
+    /// Incoming-call mode; optional so configs predating the feature decode.
+    var call: CallConfig?
 
     static let controlNames = ["P1", "P2", "P3", "P4", "F1", "F2", "F3", "F4", "B1", "B2", "B3", "B4"]
 
@@ -171,7 +205,8 @@ struct Config: Codable, Equatable {
                     "com.googlecode.iterm2": KeySpec(keyCode: 53),
                     "com.openai.chat": KeySpec(keyCode: 53),
                 ]
-            ]
+            ],
+            call: .standard
         )
     }
 

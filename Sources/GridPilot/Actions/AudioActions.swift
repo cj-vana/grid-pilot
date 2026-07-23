@@ -21,6 +21,23 @@ enum Audio {
         setVolume(device: device, scope: kAudioDevicePropertyScopeInput, value: value)
     }
 
+    /// Current output volume, for save/restore around call-mode silencing.
+    static func getOutputVolume() -> Float {
+        guard let device = defaultDevice(input: false) else { return 0.5 }
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyVolumeScalar,
+            mScope: kAudioDevicePropertyScopeOutput,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var volume: Float = 0.5
+        var size = UInt32(MemoryLayout<Float>.size)
+        if AudioObjectHasProperty(device, &address),
+           AudioObjectGetPropertyData(device, &address, 0, nil, &size, &volume) == noErr {
+            return volume
+        }
+        return 0.5
+    }
+
     static func outputDevices() -> [(id: AudioDeviceID, name: String)] {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDevices,
