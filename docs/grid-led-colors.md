@@ -10,10 +10,14 @@ switchable from the GridPilot menu bar (LED Theme):
 - **Synthwave** — purple through pink to orange
 - **Matrix** — dim green to bright green
 
-How it works: GridPilot echoes every control event back to the module
-(`leds.echo` in the config, on by default) and sends the selected theme index
-as CC 20 on channel 15 whenever you change it or replug the Grid. The snippet
-below receives both and paints the LEDs.
+How it works: GridPilot sends the selected theme index as CC 20 on channel 15
+whenever you change it or replug the Grid. The snippet below sets each
+element's min/mid/max LED palette from the theme, and the firmware's native
+palette interpolation renders the gradient as values move — smooth, and a
+theme switch recolors every LED instantly, including ones you aren't touching.
+Incoming button notes (GridPilot's call-mode ring flash) drive button LED
+phase directly. Requires firmware 1.5+ (the mid-color function); Grid Editor
+will prompt you to update older modules.
 
 ## One-time setup in Grid Editor
 
@@ -23,39 +27,34 @@ below receives both and paints the LEDs.
 4. Click **Store** so it survives power cycles.
 
 ```lua
-self.midirx_cb = function(self, header, event)
-  local ch, cmd, p1, v = event[1], event[2], event[3], event[4]
-  if ch == 15 and cmd == 176 and p1 == 20 then
-    self.theme = v
+self.midirx_cb = function(s, h, e)
+  local c, m, p, v = e[1], e[2], e[3], e[4]
+  if c == 15 and m == 176 and p == 20 then
+    for n = 0, 11 do
+      if v == 0 then     -- Heat
+        gln(n,1,0,0,255)   gld(n,1,190,0,190)  glx(n,1,255,0,0)
+      elseif v == 1 then -- Ocean
+        gln(n,1,0,20,200)  gld(n,1,0,170,220)  glx(n,1,240,255,255)
+      elseif v == 2 then -- Synthwave
+        gln(n,1,120,0,255) gld(n,1,255,60,160) glx(n,1,255,140,0)
+      else               -- Matrix
+        gln(n,1,0,30,0)    gld(n,1,0,150,20)   glx(n,1,90,255,60)
+      end
+    end
     return
   end
-  local num = -1
-  if cmd == 176 and p1 >= 32 and p1 <= 39 then num = p1 - 32 end
-  if (cmd == 144 or cmd == 128) and p1 >= 40 and p1 <= 43 then num = p1 - 32 end
-  if num < 0 then return end
-  if cmd == 128 then v = 0 end
-  local t = self.theme or 0
-  local r, g, b = 0, 0, 0
-  if t == 0 then         -- Heat
-    r = v * 2
-    b = (127 - v) * 2
-  elseif t == 1 then     -- Ocean
-    if v > 63 then r = (v - 64) * 4 end
-    g = v * 2
-    b = 200 + v // 3
-  elseif t == 2 then     -- Synthwave
-    r = 150 + v
-    if r > 255 then r = 255 end
-    g = v // 2
-    b = (127 - v) * 2
-  else                   -- Matrix
-    g = 40 + v + v // 2
-    b = v // 8
+  -- Incoming button notes = call-mode ring flash
+  if (m == 144 or m == 128) and p >= 40 and p <= 43 then
+    local x = v * 2
+    if m == 128 then x = 0 end
+    if x > 254 then x = 254 end
+    glp(p - 32, 1, x)
   end
-  led_color(num, 1, r, g, b)
-  led_value(num, 1, 25 + (v * 230) // 127)
 end
 ```
+
+(`gln`/`gld`/`glx` are `led_color_min`/`led_color_mid`/`led_color_max`;
+`glp` is `led_value`.)
 
 ## Notes
 
