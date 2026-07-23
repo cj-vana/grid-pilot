@@ -153,7 +153,7 @@ struct LEDConfig: Codable, Equatable {
         theme = try container.decodeIfPresent(Int.self, forKey: .theme) ?? 0
     }
 
-    static let themeNames = ["Heat", "Ocean", "Synthwave", "Matrix"]
+    static let themeNames = ["Heat", "Ocean", "Synthwave", "Matrix", "Lava", "Mono"]
     static let themeSelectCC = 20
     static let themeSelectChannel = 15
 }

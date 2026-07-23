@@ -9,6 +9,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var learn: LearnController?
     private var callMode: CallModeController!
     private var callWatcher: CallWatcher!
+    /// Last seen value per control, replayed after theme switches so the
+    /// module can restore correct LED levels (it forgets positions).
+    private var lastValues: [ControlKey: MIDIEvent] = [:]
 
     var isPaused = false
 
@@ -20,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             deviceName: config.midi.deviceName,
             onEvent: { [weak self] event in
                 guard let self else { return }
+                self.lastValues[ControlKey(type: event.type, number: event.number)] = event
                 if let learn = self.learn {
                     learn.handle(event)
                     return
@@ -110,6 +114,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func sendLEDTheme() {
         let theme = store.config.leds?.theme ?? 0
         midi.send(type: .cc, number: LEDConfig.themeSelectCC, value: theme, channel: LEDConfig.themeSelectChannel)
+        // The module only knows positions it has heard; replay the latest so
+        // LEDs light at real levels instead of wherever the palette left them.
+        for event in lastValues.values {
+            midi.send(type: event.type, number: event.number, value: event.value, channel: event.channel)
+        }
     }
 
     func startLearnMode() {

@@ -2,13 +2,15 @@
 
 The PBF4's LEDs are full RGB. Out of the box the module only uses its stock
 palette locally; it does not react to incoming MIDI. This one-time setup makes
-LED color and brightness track your control positions live, with four themes
+LED color and brightness track your control positions live, with six themes
 switchable from the GridPilot menu bar (LED Theme):
 
 - **Heat** — blue at zero, purple in the middle, red at max
-- **Ocean** — deep blue through teal toward white
-- **Synthwave** — purple through pink to orange
+- **Ocean** — deep navy through teal toward foam white
+- **Synthwave** — purple through hot pink to orange
 - **Matrix** — dim green to bright green
+- **Lava** — dark red through orange to yellow
+- **Mono** — black through gray to white
 
 How it works: GridPilot sends the selected theme index as CC 20 on channel 15
 whenever you change it or replug the Grid. The snippet below sets each
@@ -21,40 +23,57 @@ will prompt you to update older modules.
 
 ## One-time setup in Grid Editor
 
-1. Open Grid Editor with the module connected.
-2. Select the **System** element (top-left module icon), open the **Setup** event.
-3. Add a **Code Block** action and paste the snippet.
-4. Click **Store** so it survives power cycles.
+Two parts, both required.
+
+**1. Remove the stock color blocks.** The default profile puts a "Simple
+Color" action in every element's event, and it repaints that LED its stock
+color on every touch — fighting any theme. For each element (all 12 on a
+PBF4): select the element, open its main event (Potmeter/Button), tick the
+**Simple Color** block's checkbox, and delete it with the trash icon. Leave
+"…Mode" and "MIDI" blocks alone.
+
+**2. Install the theme handler.** Select the **System** element (Element 12),
+open the **Setup** event, replace the code block's contents with the snippet
+below, Commit, then click **Store** so it survives power cycles.
 
 ```lua
-self.midirx_cb = function(s, h, e)
-  local c, m, p, v = e[1], e[2], e[3], e[4]
-  if c == 15 and m == 176 and p == 20 then
-    for n = 0, 11 do
-      if v == 0 then     -- Heat
-        gln(n,1,0,0,255)   gld(n,1,190,0,190)  glx(n,1,255,0,0)
-      elseif v == 1 then -- Ocean
-        gln(n,1,0,20,200)  gld(n,1,0,170,220)  glx(n,1,240,255,255)
-      elseif v == 2 then -- Synthwave
-        gln(n,1,120,0,255) gld(n,1,255,60,160) glx(n,1,255,140,0)
-      else               -- Matrix
-        gln(n,1,0,30,0)    gld(n,1,0,150,20)   glx(n,1,90,255,60)
-      end
+-- Theme palettes: {min, mid, max} RGB anchors, indexed by CC 20's value + 1.
+self.T={{{0,60,255},{170,0,255},{255,30,0}},{{0,10,80},{0,190,190},{200,255,255}},{{80,0,160},{255,0,120},{255,150,0}},{{0,20,0},{0,180,30},{120,255,80}},{{20,0,0},{255,60,0},{255,220,0}},{{10,10,10},{120,120,120},{255,255,255}}}
+-- Last seen value per element, so theme switches keep true LED levels.
+self.q={}
+self.midirx_cb=function(s,h,e)
+  local c,m,p,v=e[1],e[2],e[3],e[4]
+  if c==15 and m==176 and p==20 then
+    local t=s.T[v+1] or s.T[1]
+    for n=0,11 do
+      gln(n,1,t[1][1],t[1][2],t[1][3])
+      gld(n,1,t[2][1],t[2][2],t[2][3])
+      glx(n,1,t[3][1],t[3][2],t[3][3])
+      local x=(s.q[n] or 0)*2 if x>254 then x=254 end
+      glp(n,1,x)
     end
     return
   end
-  -- Incoming button notes = call-mode ring flash
-  if (m == 144 or m == 128) and p >= 40 and p <= 43 then
-    local x = v * 2
-    if m == 128 then x = 0 end
-    if x > 254 then x = 254 end
-    glp(p - 32, 1, x)
+  local n=-1
+  if m==176 and p>=32 and p<=39 then n=p-32 end
+  if (m==144 or m==128) and p>=40 and p<=43 then
+    n=p-32
+    if m==128 then v=0 end
+  end
+  if n>=0 then
+    s.q[n]=v
+    local x=v*2 if x>254 then x=254 end
+    glp(n,1,x)
   end
 end
 ```
 
 (`gln`/`gld`/`glx` are `led_color_min`/`led_color_mid`/`led_color_max`;
-`glp` is `led_value`.)
+`glp` is `led_value`. The firmware interpolates min→mid→max as levels move.)
+GridPilot's echo (`leds.echo`) feeds the element branch; after each theme
+switch GridPilot also replays every control's last known value so LEDs light
+at real positions. LEDs are dark for controls the module hasn't heard since
+power-up — move them once.
 
 ## Notes
 
