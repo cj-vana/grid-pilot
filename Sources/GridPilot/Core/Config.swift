@@ -56,9 +56,36 @@ enum ControlKind: String, Codable {
     case button
 }
 
+enum MIDIMessageType: String, Codable {
+    case cc
+    case note
+}
+
 struct ControlDef: Codable, Equatable {
+    /// CC number or note number, depending on `type`. The JSON key stays "cc"
+    /// for config compatibility.
     var cc: Int
     var kind: ControlKind
+    var type: MIDIMessageType
+
+    init(cc: Int, kind: ControlKind, type: MIDIMessageType = .cc) {
+        self.cc = cc
+        self.kind = kind
+        self.type = type
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        cc = try container.decode(Int.self, forKey: .cc)
+        kind = try container.decode(ControlKind.self, forKey: .kind)
+        // Configs written before note support have no `type`; they were all CC.
+        type = try container.decodeIfPresent(MIDIMessageType.self, forKey: .type) ?? .cc
+    }
+}
+
+struct ControlKey: Hashable {
+    var type: MIDIMessageType
+    var number: Int
 }
 
 struct Mapping: Codable, Equatable {
@@ -159,12 +186,14 @@ struct Config: Codable, Equatable {
 
     static let controlNames = ["P1", "P2", "P3", "P4", "F1", "F2", "F3", "F4", "B1", "B2", "B3", "B4"]
 
-    /// Approved PBF4 layout. CC numbers follow the Grid default profile guess
-    /// (element index + 32); learn mode overwrites them with reality.
+    /// Approved PBF4 layout. Grid's default profile sends CC 32+element for
+    /// pots/faders and Note 32+element for buttons (elements run 0-11 top to
+    /// bottom); learn mode overwrites with whatever the profile really emits.
     static var `default`: Config {
         var controls: [String: ControlDef] = [:]
         for (i, name) in controlNames.enumerated() {
-            controls[name] = ControlDef(cc: 32 + i, kind: name.hasPrefix("B") ? .button : .continuous)
+            let isButton = name.hasPrefix("B")
+            controls[name] = ControlDef(cc: 32 + i, kind: isButton ? .button : .continuous, type: isButton ? .note : .cc)
         }
         return Config(
             version: 1,

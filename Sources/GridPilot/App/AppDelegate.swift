@@ -18,14 +18,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         midi = MIDIListener(
             deviceName: config.midi.deviceName,
-            onEvent: { [weak self] cc, value, channel in
+            onEvent: { [weak self] event in
                 guard let self else { return }
                 if let learn = self.learn {
-                    learn.handle(cc: cc, value: value)
-                } else if self.callMode.intercept(cc: cc, value: value) {
+                    learn.handle(event)
+                } else if self.callMode.intercept(event) {
                     // consumed by ringing-call overlay
                 } else if !self.isPaused {
-                    self.engine.handle(cc: cc, value: value, channel: channel)
+                    self.engine.handle(event)
                 }
             },
             onStateChange: { [weak self] connected in
@@ -37,8 +37,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         })
         engine = MappingEngine(config: config, sink: registry)
         menuBar = MenuBarController(delegate: self, store: store)
-        callMode = CallModeController(store: store, midiSend: { [weak self] cc, value, channel in
-            self?.midi.send(cc: cc, value: value, channel: channel)
+        callMode = CallModeController(store: store, midiSend: { [weak self] type, number, value, channel in
+            self?.midi.send(type: type, number: number, value: value, channel: channel)
         })
         callWatcher = CallWatcher(store: store) { [weak self] bundleID in
             self?.callMode.enter(bundleID: bundleID)

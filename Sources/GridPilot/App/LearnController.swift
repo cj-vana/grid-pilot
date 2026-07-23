@@ -10,8 +10,8 @@ final class LearnController {
     private var label: NSTextField!
     private var stepIndex = 0
     private var captured: [String: ControlDef] = [:]
-    private var valuesSeen: [Int: Set<Int>] = [:]
-    private var sawHigh: Set<Int> = []
+    private var valuesSeen: [ControlKey: Set<Int>] = [:]
+    private var sawHigh: Set<ControlKey> = []
 
     init(store: ConfigStore, onDone: @escaping () -> Void) {
         self.store = store
@@ -43,27 +43,29 @@ final class LearnController {
         prompt()
     }
 
-    func handle(cc: Int, value: Int) {
+    func handle(_ event: MIDIEvent) {
         guard let control = currentControl else { return }
-        // A CC captured for an earlier control can't also be this one.
-        guard !captured.values.contains(where: { $0.cc == cc }) else { return }
+        let key = ControlKey(type: event.type, number: event.number)
+        // A control captured for an earlier step can't also be this one.
+        guard !captured.values.contains(where: { $0.cc == key.number && $0.type == key.type }) else { return }
 
         let isButtonStep = control.hasPrefix("B")
-        valuesSeen[cc, default: []].insert(value)
+        valuesSeen[key, default: []].insert(event.value)
 
         if isButtonStep {
-            if value >= 64 { sawHigh.insert(cc) }
-            // Press then release, without the value spread of a knob sweep.
-            if value < 64 && sawHigh.contains(cc) && (valuesSeen[cc]?.count ?? 0) <= 3 {
-                capture(control: control, cc: cc, kind: .button)
+            // Buttons are notes on Grid's default profile but CC on custom
+            // ones; a press+release pair qualifies either way.
+            if event.value >= 64 { sawHigh.insert(key) }
+            if event.value < 64 && sawHigh.contains(key) && (valuesSeen[key]?.count ?? 0) <= 3 {
+                capture(control: control, key: key, kind: .button)
             }
-        } else if (valuesSeen[cc]?.count ?? 0) >= 4 {
-            capture(control: control, cc: cc, kind: .continuous)
+        } else if key.type == .cc && (valuesSeen[key]?.count ?? 0) >= 4 {
+            capture(control: control, key: key, kind: .continuous)
         }
     }
 
-    private func capture(control: String, cc: Int, kind: ControlKind) {
-        captured[control] = ControlDef(cc: cc, kind: kind)
+    private func capture(control: String, key: ControlKey, kind: ControlKind) {
+        captured[control] = ControlDef(cc: key.number, kind: kind, type: key.type)
         valuesSeen = [:]
         sawHigh = []
         stepIndex += 1

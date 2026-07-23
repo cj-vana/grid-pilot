@@ -20,9 +20,9 @@ final class CallModeController {
     private var timeoutWork: DispatchWorkItem?
     private var savedVolume: Float?
     private let store: ConfigStore
-    private let midiSend: (Int, Int, Int) -> Void
+    private let midiSend: (MIDIMessageType, Int, Int, Int) -> Void
 
-    init(store: ConfigStore, midiSend: @escaping (Int, Int, Int) -> Void) {
+    init(store: ConfigStore, midiSend: @escaping (MIDIMessageType, Int, Int, Int) -> Void) {
         self.store = store
         self.midiSend = midiSend
     }
@@ -54,15 +54,19 @@ final class CallModeController {
     }
 
     /// Returns true if the event was consumed (B1/B2 press or release while ringing).
-    func intercept(cc: Int, value: Int) -> Bool {
+    func intercept(_ event: MIDIEvent) -> Bool {
         guard active else { return false }
         let controls = store.config.controls
-        if cc == controls["B1"]?.cc {
-            if value >= 64 { answer() }
+        func matches(_ name: String) -> Bool {
+            guard let control = controls[name] else { return false }
+            return control.cc == event.number && control.type == event.type
+        }
+        if matches("B1") {
+            if event.value >= 64 { answer() }
             return true
         }
-        if cc == controls["B2"]?.cc {
-            if value >= 64 { silence() }
+        if matches("B2") {
+            if event.value >= 64 { silence() }
             return true
         }
         return false
@@ -109,20 +113,20 @@ final class CallModeController {
         flashTimer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: true) { [weak self] _ in
             guard let self else { return }
             on.toggle()
-            for name in ["B1", "B2", "B3", "B4"] {
-                if let cc = self.store.config.controls[name]?.cc {
-                    self.midiSend(cc, on ? 127 : 0, 0)
-                }
-            }
+            self.sendToButtons(value: on ? 127 : 0)
         }
     }
 
     private func stopFlashing() {
         flashTimer?.invalidate()
         flashTimer = nil
+        sendToButtons(value: 0)
+    }
+
+    private func sendToButtons(value: Int) {
         for name in ["B1", "B2", "B3", "B4"] {
-            if let cc = store.config.controls[name]?.cc {
-                midiSend(cc, 0, 0)
+            if let control = store.config.controls[name] {
+                midiSend(control.type, control.cc, value, 0)
             }
         }
     }

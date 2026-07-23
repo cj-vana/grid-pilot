@@ -44,19 +44,23 @@ final class EngineTests: XCTestCase {
         engine = MappingEngine(config: .default, sink: sink, now: time.now, schedule: time.schedule)
     }
 
-    private func cc(of control: String) -> Int { Config.default.controls[control]!.cc }
+    /// Builds the event a given control would emit, using the default config's
+    /// number and message type (buttons are notes, pots/faders are CCs).
+    private func event(_ control: String, _ value: Int, channel: Int = 0) -> MIDIEvent {
+        let def = Config.default.controls[control]!
+        return MIDIEvent(type: def.type, number: def.cc, value: value, channel: channel)
+    }
 
     func testContinuousControlRoutesNormalizedValue() {
-        engine.handle(cc: cc(of: "F2"), value: 127, channel: 0)
+        engine.handle(event("F2", 127))
         XCTAssertEqual(sink.calls.count, 1)
         XCTAssertEqual(sink.calls[0].action, "systemVolume")
         XCTAssertEqual(sink.calls[0].value, 1.0)
     }
 
     func testCoalescerDropsIntermediateButDeliversLast() {
-        let fader = cc(of: "F2")
         for v in [10, 20, 30, 40, 50] {
-            engine.handle(cc: fader, value: v, channel: 0)
+            engine.handle(event("F2", v))
         }
         // First goes through immediately; the rest wait on the trailing timer.
         XCTAssertEqual(sink.calls.count, 1)
@@ -67,33 +71,38 @@ final class EngineTests: XCTestCase {
     }
 
     func testQuickPressIsTap() {
-        let button = cc(of: "B4")
-        engine.handle(cc: button, value: 127, channel: 0)
+        engine.handle(event("B4", 127))
         XCTAssertEqual(sink.calls.count, 0)
         time.advance(ms: 100)
-        engine.handle(cc: button, value: 0, channel: 0)
+        engine.handle(event("B4", 0))
         XCTAssertEqual(sink.calls.map(\.action), ["spotifyPlayPause"])
     }
 
+    func testNoteButtonIgnoresSameNumberCC() {
+        // B1 is note 40 by default; a CC 40 must not fire it.
+        let def = Config.default.controls["B1"]!
+        engine.handle(MIDIEvent(type: .cc, number: def.cc, value: 127, channel: 0))
+        engine.handle(MIDIEvent(type: .cc, number: def.cc, value: 0, channel: 0))
+        XCTAssertEqual(sink.calls.count, 0)
+    }
+
     func testHoldFiresLongPressAtThresholdAndSwallowsRelease() {
-        let button = cc(of: "B4")
-        engine.handle(cc: button, value: 127, channel: 0)
+        engine.handle(event("B4", 127))
         time.advance(ms: 400)
         XCTAssertEqual(sink.calls.map(\.action), ["spotifyNextTrack"])
-        engine.handle(cc: button, value: 0, channel: 0)
+        engine.handle(event("B4", 0))
         XCTAssertEqual(sink.calls.count, 1, "release after long-press must not also tap")
     }
 
     func testTapOnlyButtonTreatsHoldAsTap() {
-        let button = cc(of: "B1")  // contextEscape, no longPress mapping
-        engine.handle(cc: button, value: 127, channel: 0)
+        engine.handle(event("B1", 127))  // contextEscape, no longPress mapping
         time.advance(ms: 500)
-        engine.handle(cc: button, value: 0, channel: 0)
+        engine.handle(event("B1", 0))
         XCTAssertEqual(sink.calls.map(\.action), ["contextEscape"])
     }
 
-    func testUnmappedCCIsIgnored() {
-        engine.handle(cc: 99, value: 64, channel: 0)
+    func testUnmappedNumberIsIgnored() {
+        engine.handle(MIDIEvent(type: .cc, number: 99, value: 64, channel: 0))
         XCTAssertEqual(sink.calls.count, 0)
     }
 
@@ -101,9 +110,9 @@ final class EngineTests: XCTestCase {
         var config = Config.default
         config.midi.channel = 2
         engine.update(config: config)
-        engine.handle(cc: cc(of: "F2"), value: 64, channel: 0)
+        engine.handle(event("F2", 64, channel: 0))
         XCTAssertEqual(sink.calls.count, 0)
-        engine.handle(cc: cc(of: "F2"), value: 64, channel: 2)
+        engine.handle(event("F2", 64, channel: 2))
         XCTAssertEqual(sink.calls.count, 1)
     }
 
@@ -111,16 +120,15 @@ final class EngineTests: XCTestCase {
         var config = Config.default
         config.mappings["F2"] = Mapping(action: ActionSpec(action: "alertVolume"))
         engine.update(config: config)
-        engine.handle(cc: cc(of: "F2"), value: 127, channel: 0)
+        engine.handle(event("F2", 127))
         XCTAssertEqual(sink.calls.map(\.action), ["alertVolume"])
     }
 
     func testRepeatedPressEventsWhileDownDoNotDoubleFire() {
-        let button = cc(of: "B4")
-        engine.handle(cc: button, value: 127, channel: 0)
-        engine.handle(cc: button, value: 127, channel: 0)
+        engine.handle(event("B4", 127))
+        engine.handle(event("B4", 127))
         time.advance(ms: 100)
-        engine.handle(cc: button, value: 0, channel: 0)
+        engine.handle(event("B4", 0))
         XCTAssertEqual(sink.calls.count, 1)
     }
 }

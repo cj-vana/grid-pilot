@@ -29,9 +29,10 @@ enum AIPrompt {
         - `version`: must be 1.
         - `midi`: `{ "deviceName": string, "channel": int|null }` — null channel = any.
         - `longPressMs`: 100-2000, button hold threshold.
-        - `controls`: map of control name → `{ "cc": 0-127, "kind": "continuous"|"button" }`.
-          CCs must be unique. Do not change CCs unless asked — they were captured
-          from the physical device by learn mode.
+        - `controls`: map of control name → `{ "cc": 0-127, "kind": "continuous"|"button", "type": "cc"|"note" }`.
+          `cc` is the CC or note number; `type` says which (Grid buttons send notes).
+          type+number pairs must be unique. Do not change these unless asked — they
+          were captured from the physical device by learn mode.
         - `mappings`: map of control name → mapping.
           Continuous controls: `{ "action": ActionSpec }`.
           Buttons: `{ "tap": ActionSpec?, "longPress": ActionSpec? }` (at least one).

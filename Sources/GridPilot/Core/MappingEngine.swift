@@ -14,9 +14,9 @@ final class MappingEngine {
     private weak var sink: ActionSink?
     private let now: () -> UInt64  // milliseconds
     private let schedule: Scheduler
-    private var coalescers: [Int: Coalescer] = [:]
-    private var gestures: [Int: ButtonGesture] = [:]
-    private var byCC: [Int: (name: String, control: ControlDef)] = [:]
+    private var coalescers: [ControlKey: Coalescer] = [:]
+    private var gestures: [ControlKey: ButtonGesture] = [:]
+    private var byKey: [ControlKey: (name: String, control: ControlDef)] = [:]
 
     init(
         config: Config,
@@ -38,41 +38,43 @@ final class MappingEngine {
         rebuild()
     }
 
-    func handle(cc: Int, value: Int, channel: Int) {
-        if let expected = config.midi.channel, expected != channel { return }
-        guard let (name, control) = byCC[cc], let mapping = config.mappings[name] else { return }
+    func handle(_ event: MIDIEvent) {
+        if let expected = config.midi.channel, expected != event.channel { return }
+        let key = ControlKey(type: event.type, number: event.number)
+        guard let (name, control) = byKey[key], let mapping = config.mappings[name] else { return }
 
         switch control.kind {
         case .continuous:
             guard let spec = mapping.action else { return }
-            let normalized = Float(min(max(value, 0), 127)) / 127.0
-            coalescer(for: cc).submit(value: normalized) { [weak self] v in
+            let normalized = Float(min(max(event.value, 0), 127)) / 127.0
+            coalescer(for: key).submit(value: normalized) { [weak self] v in
                 self?.sink?.run(spec, value: v)
             }
         case .button:
-            gesture(for: cc, mapping: mapping).handle(pressed: value >= 64)
+            // Note buttons: on = press, off/vel-0 = release. CC buttons: ≥64 press.
+            gesture(for: key, mapping: mapping).handle(pressed: event.value >= 64)
         }
     }
 
     private func rebuild() {
-        byCC = [:]
+        byKey = [:]
         for (name, control) in config.controls {
-            byCC[control.cc] = (name, control)
+            byKey[ControlKey(type: control.type, number: control.cc)] = (name, control)
         }
-        // Drop stale per-CC state so remapped controls start clean.
+        // Drop stale per-control state so remapped controls start clean.
         coalescers = [:]
         gestures = [:]
     }
 
-    private func coalescer(for cc: Int) -> Coalescer {
-        if let existing = coalescers[cc] { return existing }
+    private func coalescer(for key: ControlKey) -> Coalescer {
+        if let existing = coalescers[key] { return existing }
         let created = Coalescer(intervalMs: 33, now: now, schedule: schedule)
-        coalescers[cc] = created
+        coalescers[key] = created
         return created
     }
 
-    private func gesture(for cc: Int, mapping: Mapping) -> ButtonGesture {
-        if let existing = gestures[cc] { return existing }
+    private func gesture(for key: ControlKey, mapping: Mapping) -> ButtonGesture {
+        if let existing = gestures[key] { return existing }
         let created = ButtonGesture(
             longPressMs: config.longPressMs,
             schedule: schedule,
@@ -85,7 +87,7 @@ final class MappingEngine {
                 if let spec = mapping.longPress ?? mapping.tap { self?.sink?.run(spec, value: nil) }
             }
         )
-        gestures[cc] = created
+        gestures[key] = created
         return created
     }
 }

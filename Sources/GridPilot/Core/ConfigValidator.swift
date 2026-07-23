@@ -13,15 +13,16 @@ enum ConfigValidator {
             problems.append("longPressMs \(config.longPressMs) out of range 100...2000.")
         }
 
-        var seenCCs: [Int: String] = [:]
+        var seenKeys: [ControlKey: String] = [:]
         for (name, control) in config.controls.sorted(by: { $0.key < $1.key }) {
             if control.cc < 0 || control.cc > 127 {
-                problems.append("Control \(name): CC \(control.cc) out of range 0...127.")
+                problems.append("Control \(name): \(control.type.rawValue) number \(control.cc) out of range 0...127.")
             }
-            if let existing = seenCCs[control.cc] {
-                problems.append("Control \(name): CC \(control.cc) already used by \(existing).")
+            let key = ControlKey(type: control.type, number: control.cc)
+            if let existing = seenKeys[key] {
+                problems.append("Control \(name): \(control.type.rawValue) \(control.cc) already used by \(existing).")
             } else {
-                seenCCs[control.cc] = name
+                seenKeys[key] = name
             }
         }
 

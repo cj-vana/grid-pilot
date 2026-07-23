@@ -1,18 +1,34 @@
 import Foundation
 import CoreMIDI
 
-/// Extracts (cc, value, channel) from a MIDI 1.0 Universal MIDI Packet word.
-/// UMP MIDI 1.0 channel voice: mt=2 in the top nibble, then group, status byte,
-/// data1, data2. Returns nil for anything that isn't a control change.
-func parseCC(word: UInt32) -> (cc: Int, value: Int, channel: Int)? {
+struct MIDIEvent: Equatable {
+    var type: MIDIMessageType
+    var number: Int
+    var value: Int
+    var channel: Int
+}
+
+/// Extracts a CC or note event from a MIDI 1.0 Universal MIDI Packet word.
+/// UMP MIDI 1.0 channel voice: mt=2 in the top nibble, then group, status
+/// byte, data1, data2. Grid pots/faders send CC; its buttons send notes, so
+/// note on/off normalize to value = velocity / 0.
+func parseEvent(word: UInt32) -> MIDIEvent? {
     let messageType = (word >> 28) & 0xF
     guard messageType == 2 else { return nil }
     let status = (word >> 16) & 0xFF
-    guard status & 0xF0 == 0xB0 else { return nil }
     let channel = Int(status & 0x0F)
-    let cc = Int((word >> 8) & 0x7F)
+    let number = Int((word >> 8) & 0x7F)
     let value = Int(word & 0x7F)
-    return (cc, value, channel)
+    switch status & 0xF0 {
+    case 0xB0:
+        return MIDIEvent(type: .cc, number: number, value: value, channel: channel)
+    case 0x90:
+        return MIDIEvent(type: .note, number: number, value: value, channel: channel)
+    case 0x80:
+        return MIDIEvent(type: .note, number: number, value: 0, channel: channel)
+    default:
+        return nil
+    }
 }
 
 /// Connects to every CoreMIDI source whose device name contains `deviceName`,
@@ -20,7 +36,7 @@ func parseCC(word: UInt32) -> (cc: Int, value: Int, channel: Int)? {
 /// feedback.
 final class MIDIListener {
     private let deviceName: String
-    private let onEvent: (Int, Int, Int) -> Void
+    private let onEvent: (MIDIEvent) -> Void
     private let onStateChange: (Bool) -> Void
     private var client = MIDIClientRef()
     private var inputPort = MIDIPortRef()
@@ -30,7 +46,7 @@ final class MIDIListener {
 
     init(
         deviceName: String,
-        onEvent: @escaping (Int, Int, Int) -> Void,
+        onEvent: @escaping (MIDIEvent) -> Void,
         onStateChange: @escaping (Bool) -> Void
     ) {
         self.deviceName = deviceName
@@ -57,8 +73,13 @@ final class MIDIListener {
     }
 
     func send(cc: Int, value: Int, channel: Int) {
+        send(type: .cc, number: cc, value: value, channel: channel)
+    }
+
+    func send(type: MIDIMessageType, number: Int, value: Int, channel: Int) {
         guard destination != 0 else { return }
-        let word: UInt32 = (2 << 28) | (0xB0 | UInt32(channel & 0xF)) << 16 | UInt32(cc & 0x7F) << 8 | UInt32(value & 0x7F)
+        let status: UInt32 = type == .note ? 0x90 : 0xB0
+        let word: UInt32 = (2 << 28) | (status | UInt32(channel & 0xF)) << 16 | UInt32(number & 0x7F) << 8 | UInt32(value & 0x7F)
         var eventList = MIDIEventList()
         let packet = MIDIEventListInit(&eventList, ._1_0)
         MIDIEventListAdd(&eventList, MemoryLayout<MIDIEventList>.size, packet, 0, 1, [word])
@@ -68,14 +89,14 @@ final class MIDIListener {
     var isConnected: Bool { !connectedSources.isEmpty }
 
     private func receive(_ eventList: UnsafePointer<MIDIEventList>) {
-        var events: [(Int, Int, Int)] = []
+        var events: [MIDIEvent] = []
         var packet = eventList.pointee.packet
         for _ in 0..<eventList.pointee.numPackets {
             let wordCount = Int(packet.wordCount)
             withUnsafeBytes(of: packet.words) { raw in
                 let words = raw.bindMemory(to: UInt32.self)
                 for i in 0..<min(wordCount, words.count) {
-                    if let event = parseCC(word: words[i]) {
+                    if let event = parseEvent(word: words[i]) {
                         events.append(event)
                     }
                 }
@@ -84,8 +105,8 @@ final class MIDIListener {
         }
         guard !events.isEmpty else { return }
         DispatchQueue.main.async { [onEvent] in
-            for (cc, value, channel) in events {
-                onEvent(cc, value, channel)
+            for event in events {
+                onEvent(event)
             }
         }
     }

@@ -14,25 +14,30 @@ final class ZoneAndParseTests: XCTestCase {
         XCTAssertEqual(zoneIndex(value: 1.5, zones: 4), 3)
     }
 
-    func testParseCCExtractsControlChange() {
+    func testParseEventExtractsControlChange() {
         // UMP MIDI 1.0: mt=2, group 0, status 0xB0 (CC ch0), cc 34, value 100
         let word: UInt32 = (2 << 28) | (0xB0 << 16) | (34 << 8) | 100
-        let parsed = parseCC(word: word)
-        XCTAssertEqual(parsed?.cc, 34)
-        XCTAssertEqual(parsed?.value, 100)
-        XCTAssertEqual(parsed?.channel, 0)
+        XCTAssertEqual(parseEvent(word: word), MIDIEvent(type: .cc, number: 34, value: 100, channel: 0))
     }
 
-    func testParseCCReadsChannel() {
+    func testParseEventReadsChannel() {
         let word: UInt32 = (2 << 28) | (0xB5 << 16) | (7 << 8) | 127
-        XCTAssertEqual(parseCC(word: word)?.channel, 5)
+        XCTAssertEqual(parseEvent(word: word)?.channel, 5)
     }
 
-    func testParseCCRejectsNoteOnAndSysex() {
-        let noteOn: UInt32 = (2 << 28) | (0x90 << 16) | (60 << 8) | 100
-        XCTAssertNil(parseCC(word: noteOn))
+    func testParseEventHandlesNotes() {
+        // Grid buttons: note on with velocity = press, note off = release.
+        let noteOn: UInt32 = (2 << 28) | (0x90 << 16) | (40 << 8) | 127
+        XCTAssertEqual(parseEvent(word: noteOn), MIDIEvent(type: .note, number: 40, value: 127, channel: 0))
+        let noteOff: UInt32 = (2 << 28) | (0x80 << 16) | (40 << 8) | 64
+        XCTAssertEqual(parseEvent(word: noteOff), MIDIEvent(type: .note, number: 40, value: 0, channel: 0))
+    }
+
+    func testParseEventRejectsSysexAndOtherStatuses() {
         let sysex: UInt32 = (3 << 28) | (0xB0 << 16) | (34 << 8) | 100
-        XCTAssertNil(parseCC(word: sysex))
+        XCTAssertNil(parseEvent(word: sysex))
+        let aftertouch: UInt32 = (2 << 28) | (0xD0 << 16) | (34 << 8) | 100
+        XCTAssertNil(parseEvent(word: aftertouch))
     }
 }
 
