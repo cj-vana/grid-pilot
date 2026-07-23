@@ -20,6 +20,8 @@ Top-level keys (all required):
   CCs sent to the Grid when `gridpilot notify` fires (LED feedback).
 - `contextKeys`: action name → bundle id → `{ "keyCode": int, "modifiers": [string]? }`.
   Used by context-aware actions; apps not listed are no-ops.
+- `leds` (optional): `{ "echo": bool }` — echo control events back to the Grid
+  for LED color feedback (needs a midirx handler in the Grid profile).
 - `call` (optional): incoming-call mode. `{ "enabled": bool, "ringTimeoutSec": int,
   "flashLEDs": bool, "apps": { bundleId: { "name": string, "answerKey": KeySpec|null } } }`.
   While a configured app rings, B1 answers (activates the app, sends answerKey if set)
@@ -33,6 +35,7 @@ Available actions:
 - `contextEscape` [button]: Send the key configured in contextKeys for the frontmost app; no-op elsewhere.
 - `displayBrightness` [continuous (fader/pot)]: Main display brightness (private DisplayServices API).
 - `itermTabPicker` [continuous (fader/pot)]: Knob zones select the focused iTerm tab.
+- `itermTransparency` [continuous (fader/pot)]: iTerm current-session background transparency; 0 = opaque, max ~85% so text stays readable.
 - `keystroke` [button]: Send a keystroke. Params: keyCode (int), modifiers (array of cmd/shift/option/control). Required params: keyCode.
 - `micVolume` [continuous (fader/pot)]: Default input device volume; 0 mutes.
 - `midiSend` [any control]: Send a CC back to the Grid (LED feedback). Params: cc, value, channel (default 0). Required params: cc, value.

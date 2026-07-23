@@ -13,6 +13,9 @@ struct Executors {
     var newITermTab: (String) -> Void = { Scripts.newITermTab(command: $0) }
     var selectITermTab: (Int) -> Void = { Scripts.selectITermTab(index: $0) }
     var itermTabCount: () -> Int = { Scripts.itermTabCount() }
+    var itermTransparency: (Float) -> Void = {
+        Scripts.runAppleScript("tell application \"iTerm2\" to tell current session of current window to set transparency to \(String(format: "%.2f", $0 * 0.85))")
+    }
     var outputDevices: () -> [(id: UInt32, name: String)] = { Audio.outputDevices() }
     var setDefaultOutput: (UInt32) -> Void = { Audio.setDefaultOutput($0) }
     var keystroke: (KeySpec) -> Void = { Keystroke.send($0) }
@@ -54,6 +57,7 @@ final class ActionRegistry: ActionSink {
         case "nightShiftWarmth": if let v = value { executors.nightShift(v) }
         case "itermTabPicker": if let v = value { pickITermTab(v) }
         case "outputDeviceDial": if let v = value { pickOutputDevice(v, spec: spec) }
+        case "itermTransparency": if let v = value { executors.itermTransparency(v) }
         case "contextEscape": contextKeystroke(action: spec.action)
         case "newClaudeSession":
             executors.newITermTab(spec.string("command") ?? "claude --dangerously-skip-permissions")

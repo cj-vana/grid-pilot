@@ -133,6 +133,31 @@ struct NotifyConfig: Codable, Equatable {
     var midiOut: [NotifyMIDI]
 }
 
+struct LEDConfig: Codable, Equatable {
+    /// Echo every control event back to the Grid so a midirx handler in the
+    /// module's profile can drive LED color/intensity from live values
+    /// (see docs/grid-led-colors.md).
+    var echo: Bool
+    /// Palette index the Grid-side snippet uses (0 heat, 1 ocean, 2 synthwave,
+    /// 3 matrix). Sent as CC 20 on channel 15 at connect and when changed.
+    var theme: Int
+
+    init(echo: Bool, theme: Int = 0) {
+        self.echo = echo
+        self.theme = theme
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        echo = try container.decode(Bool.self, forKey: .echo)
+        theme = try container.decodeIfPresent(Int.self, forKey: .theme) ?? 0
+    }
+
+    static let themeNames = ["Heat", "Ocean", "Synthwave", "Matrix"]
+    static let themeSelectCC = 20
+    static let themeSelectChannel = 15
+}
+
 struct KeySpec: Codable, Equatable {
     /// macOS virtual key code (53 = Escape, 36 = Return).
     var keyCode: Int
@@ -183,6 +208,8 @@ struct Config: Codable, Equatable {
     var contextKeys: [String: [String: KeySpec]]
     /// Incoming-call mode; optional so configs predating the feature decode.
     var call: CallConfig?
+    /// LED feedback; optional so configs predating the feature decode.
+    var leds: LEDConfig?
 
     static let controlNames = ["P1", "P2", "P3", "P4", "F1", "F2", "F3", "F4", "B1", "B2", "B3", "B4"]
 
@@ -204,7 +231,7 @@ struct Config: Codable, Equatable {
                 "P1": Mapping(action: ActionSpec(action: "displayBrightness")),
                 "P2": Mapping(action: ActionSpec(action: "micVolume")),
                 "P3": Mapping(action: ActionSpec(action: "itermTabPicker")),
-                "P4": Mapping(action: ActionSpec(action: "outputDeviceDial")),
+                "P4": Mapping(action: ActionSpec(action: "itermTransparency")),
                 "F1": Mapping(action: ActionSpec(action: "spotifyVolume")),
                 "F2": Mapping(action: ActionSpec(action: "systemVolume")),
                 "F3": Mapping(action: ActionSpec(action: "alertVolume")),
@@ -235,7 +262,8 @@ struct Config: Codable, Equatable {
                     "com.openai.chat": KeySpec(keyCode: 53),
                 ]
             ],
-            call: .standard
+            call: .standard,
+            leds: LEDConfig(echo: true)
         )
     }
 

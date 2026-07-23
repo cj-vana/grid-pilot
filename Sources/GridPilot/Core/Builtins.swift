@@ -27,6 +27,7 @@ enum Builtins {
         "nightShiftWarmth": BuiltinMeta(input: .continuous, requiredParams: [], doc: "Night Shift strength (private CoreBrightness API); 0 disables."),
         "itermTabPicker": BuiltinMeta(input: .continuous, requiredParams: [], doc: "Knob zones select the focused iTerm tab."),
         "outputDeviceDial": BuiltinMeta(input: .continuous, requiredParams: [], doc: "Knob zones switch the default audio output device. Optional param `devices`: ordered name list."),
+        "itermTransparency": BuiltinMeta(input: .continuous, requiredParams: [], doc: "iTerm current-session background transparency; 0 = opaque, max ~85% so text stays readable."),
         "contextEscape": BuiltinMeta(input: .trigger, requiredParams: [], doc: "Send the key configured in contextKeys for the frontmost app; no-op elsewhere."),
         "newClaudeSession": BuiltinMeta(input: .trigger, requiredParams: [], doc: "New iTerm tab running `claude --dangerously-skip-permissions`. Optional param `command` overrides."),
         "newCodexSession": BuiltinMeta(input: .trigger, requiredParams: [], doc: "New iTerm tab running `codex --yolo`. Optional param `command` overrides."),

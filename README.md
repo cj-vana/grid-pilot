@@ -11,7 +11,7 @@ No Electron, no dependencies. One Swift menu-bar app.
 | P1 (pot) | Display brightness |
 | P2 (pot) | Mic input volume, zero is a hard mute |
 | P3 (pot) | Session picker: knob position selects the focused iTerm tab |
-| P4 (pot) | Output device dial: knob zones switch speakers, headphones, AirPods |
+| P4 (pot) | iTerm background transparency |
 | F1 (fader) | Spotify volume, independent of system volume |
 | F2 (fader) | System output volume |
 | F3 (fader) | Alert/notification volume |
@@ -21,7 +21,11 @@ No Electron, no dependencies. One Swift menu-bar app.
 | B3 (button) | Region screenshot to clipboard. Hold for full screen |
 | B4 (button) | Spotify play/pause. Hold for next track |
 
-Buttons are context-aware. The interrupt button checks which app is frontmost and sends the right key to the right place, or nothing at all.
+Buttons are context-aware. The interrupt button checks which app is frontmost and sends the right key to the right place, or nothing at all. An output-device dial (knob zones switch speakers/headphones/AirPods) is also built in; assign it to any control with one `gridpilot ai` sentence.
+
+### LED color themes
+
+The Grid's RGB LEDs can track your control positions live, with four palettes (Heat, Ocean, Synthwave, Matrix) switchable from the menu bar. GridPilot echoes values back to the module automatically; a one-time Grid Editor snippet does the painting. See [docs/grid-led-colors.md](docs/grid-led-colors.md).
 
 ### Incoming call mode
 

@@ -22,7 +22,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard let self else { return }
                 if let learn = self.learn {
                     learn.handle(event)
-                } else if self.callMode.intercept(event) {
+                    return
+                }
+                // Echo values back so a midirx LED handler in the Grid profile
+                // can color LEDs from live positions (docs/grid-led-colors.md).
+                if self.store.config.leds?.echo == true && !self.callMode.active {
+                    self.midi.send(type: event.type, number: event.number, value: event.value, channel: event.channel)
+                }
+                if self.callMode.intercept(event) {
                     // consumed by ringing-call overlay
                 } else if !self.isPaused {
                     self.engine.handle(event)
@@ -30,6 +37,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             },
             onStateChange: { [weak self] connected in
                 self?.menuBar.setConnected(connected)
+                // Re-assert the LED theme after replug; the module forgets
+                // runtime variables on power cycle.
+                if connected { self?.sendLEDTheme() }
             }
         )
         registry = ActionRegistry(config: config, midiSend: { [weak self] cc, value, channel in
@@ -88,6 +98,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         for out in config.notify.midiOut {
             midi.send(cc: out.cc, value: out.value, channel: out.channel)
         }
+    }
+
+    func setLEDTheme(_ index: Int) {
+        var config = store.config
+        config.leds = LEDConfig(echo: config.leds?.echo ?? true, theme: index)
+        try? store.apply(config, backup: false)
+        sendLEDTheme()
+    }
+
+    func sendLEDTheme() {
+        let theme = store.config.leds?.theme ?? 0
+        midi.send(type: .cc, number: LEDConfig.themeSelectCC, value: theme, channel: LEDConfig.themeSelectChannel)
     }
 
     func startLearnMode() {

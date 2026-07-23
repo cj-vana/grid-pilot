@@ -110,8 +110,41 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             entry.state = store.config.ai.provider == name ? .on : .off
             providerMenu.addItem(entry)
         }
+        providerMenu.addItem(.separator())
+        for name in ["codex", "claude"] {
+            let modelItem = NSMenuItem(title: "Set \(name) model…", action: #selector(promptModel(_:)), keyEquivalent: "")
+            modelItem.target = self
+            modelItem.representedObject = name
+            providerMenu.addItem(modelItem)
+
+            let effortItem = NSMenuItem(title: "\(name) effort", action: nil, keyEquivalent: "")
+            let effortMenu = NSMenu()
+            let current = name == "codex" ? store.config.ai.codex.effort : store.config.ai.claude.effort
+            for effort in ["low", "medium", "high", "xhigh", "max"] {
+                let entry = NSMenuItem(title: effort, action: #selector(setEffort(_:)), keyEquivalent: "")
+                entry.target = self
+                entry.representedObject = [name, effort]
+                entry.state = current == effort ? .on : .off
+                effortMenu.addItem(entry)
+            }
+            providerMenu.setSubmenu(effortMenu, for: effortItem)
+            providerMenu.addItem(effortItem)
+        }
         menu.setSubmenu(providerMenu, for: provider)
         menu.addItem(provider)
+
+        let theme = NSMenuItem(title: "LED Theme", action: nil, keyEquivalent: "")
+        let themeMenu = NSMenu()
+        let currentTheme = store.config.leds?.theme ?? 0
+        for (index, name) in LEDConfig.themeNames.enumerated() {
+            let entry = NSMenuItem(title: name, action: #selector(setLEDTheme(_:)), keyEquivalent: "")
+            entry.target = self
+            entry.tag = index
+            entry.state = currentTheme == index ? .on : .off
+            themeMenu.addItem(entry)
+        }
+        menu.setSubmenu(themeMenu, for: theme)
+        menu.addItem(theme)
         menu.addItem(.separator())
 
         menu.addItem(item("Learn Controls…", #selector(startLearn), key: ""))
@@ -149,6 +182,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         "nightShiftWarmth": "Night Shift warmth",
         "itermTabPicker": "iTerm tab picker",
         "outputDeviceDial": "Output device dial",
+        "itermTransparency": "iTerm transparency",
         "contextEscape": "Interrupt (Esc to iTerm/ChatGPT)",
         "newClaudeSession": "New Claude session",
         "newCodexSession": "New Codex session",
@@ -217,6 +251,37 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         guard let name = sender.representedObject as? String else { return }
         var config = store.config
         config.ai.provider = name
+        try? store.apply(config, backup: false)
+    }
+
+    @objc private func setLEDTheme(_ sender: NSMenuItem) {
+        appDelegate?.setLEDTheme(sender.tag)
+    }
+
+    @objc private func promptModel(_ sender: NSMenuItem) {
+        guard let provider = sender.representedObject as? String else { return }
+        var config = store.config
+        let current = provider == "codex" ? config.ai.codex.model : config.ai.claude.model
+        let alert = NSAlert()
+        alert.messageText = "Model for \(provider)"
+        alert.informativeText = "Any model id the \(provider) CLI accepts."
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        field.stringValue = current
+        alert.accessoryView = field
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let model = field.stringValue.trimmingCharacters(in: .whitespaces)
+        guard !model.isEmpty else { return }
+        if provider == "codex" { config.ai.codex.model = model } else { config.ai.claude.model = model }
+        try? store.apply(config, backup: false)
+    }
+
+    @objc private func setEffort(_ sender: NSMenuItem) {
+        guard let pair = sender.representedObject as? [String], pair.count == 2 else { return }
+        var config = store.config
+        if pair[0] == "codex" { config.ai.codex.effort = pair[1] } else { config.ai.claude.effort = pair[1] }
         try? store.apply(config, backup: false)
     }
 
