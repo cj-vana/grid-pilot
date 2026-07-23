@@ -34,7 +34,9 @@ enum AIPrompt {
           `channel` null matches any channel; chained Grid modules reuse numbers on
           different channels, so multi-module controls set it. type+number+channel
           must be unique. Do not change these unless asked — they were captured from
-          the physical device by learn mode.
+          the physical device by learn mode. Optional `encoding`:
+          "absolute" (default) | "relative64" (65=+1/63=-1) | "relative2c" (1=+1/127=-1)
+          for endless encoders configured in a relative mode.
         - `mappings`: map of control name → mapping.
           Continuous controls: `{ "action": ActionSpec }`.
           Buttons: `{ "tap": ActionSpec?, "longPress": ActionSpec? }` (at least one).

@@ -17,6 +17,8 @@ final class MappingEngine {
     private var coalescers: [ControlKey: Coalescer] = [:]
     private var gestures: [ControlKey: ButtonGesture] = [:]
     private var byKey: [ControlKey: (name: String, control: ControlDef)] = [:]
+    /// Accumulated position per relative encoder, midpoint start.
+    private var encoderLevels: [ControlKey: Float] = [:]
 
     init(
         config: Config,
@@ -51,7 +53,18 @@ final class MappingEngine {
         switch control.kind {
         case .continuous:
             guard let spec = mapping.action else { return }
-            let normalized = Float(min(max(event.value, 0), 127)) / 127.0
+            let level: Float
+            switch control.encoding {
+            case .absolute:
+                level = Float(min(max(event.value, 0), 127))
+            case .relative64:
+                // 65..127 = clockwise steps, 63..0 = counter-clockwise.
+                level = accumulate(key: key, delta: Float(event.value - 64))
+            case .relative2c:
+                let delta = event.value <= 64 ? Float(event.value) : Float(event.value - 128)
+                level = accumulate(key: key, delta: delta)
+            }
+            let normalized = level / 127.0
             coalescer(for: key).submit(value: normalized) { [weak self] v in
                 self?.sink?.run(spec, value: v)
             }
@@ -69,6 +82,13 @@ final class MappingEngine {
         // Drop stale per-control state so remapped controls start clean.
         coalescers = [:]
         gestures = [:]
+        encoderLevels = [:]
+    }
+
+    private func accumulate(key: ControlKey, delta: Float) -> Float {
+        let level = min(max((encoderLevels[key] ?? 64) + delta, 0), 127)
+        encoderLevels[key] = level
+        return level
     }
 
     private func coalescer(for key: ControlKey) -> Coalescer {

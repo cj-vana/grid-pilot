@@ -61,6 +61,16 @@ enum MIDIMessageType: String, Codable {
     case note
 }
 
+/// Grid encoders default to absolute (the module accumulates internally).
+/// Profiles can opt into relative modes; these decode the two documented ones.
+enum ControlEncoding: String, Codable {
+    case absolute
+    /// Sign-magnitude around 64: 65 = +1 step, 63 = -1 (endless_mode 1).
+    case relative64
+    /// Two's complement: 1 = +1, 127 = -1 (endless_mode 2, endless_max 127).
+    case relative2c
+}
+
 struct ControlDef: Codable, Equatable {
     /// CC number or note number, depending on `type`. The JSON key stays "cc"
     /// for config compatibility.
@@ -71,12 +81,14 @@ struct ControlDef: Codable, Equatable {
     /// Grid modules reuse the same CC numbers on different channels
     /// (channel = moduleY*4 + page), so multi-module setups need this set.
     var channel: Int?
+    var encoding: ControlEncoding
 
-    init(cc: Int, kind: ControlKind, type: MIDIMessageType = .cc, channel: Int? = nil) {
+    init(cc: Int, kind: ControlKind, type: MIDIMessageType = .cc, channel: Int? = nil, encoding: ControlEncoding = .absolute) {
         self.cc = cc
         self.kind = kind
         self.type = type
         self.channel = channel
+        self.encoding = encoding
     }
 
     init(from decoder: Decoder) throws {
@@ -86,6 +98,7 @@ struct ControlDef: Codable, Equatable {
         // Configs written before note support have no `type`; they were all CC.
         type = try container.decodeIfPresent(MIDIMessageType.self, forKey: .type) ?? .cc
         channel = try container.decodeIfPresent(Int.self, forKey: .channel)
+        encoding = try container.decodeIfPresent(ControlEncoding.self, forKey: .encoding) ?? .absolute
     }
 
     func matches(_ event: MIDIEvent) -> Bool {

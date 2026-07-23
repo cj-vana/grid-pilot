@@ -132,3 +132,39 @@ final class EngineTests: XCTestCase {
         XCTAssertEqual(sink.calls.count, 1)
     }
 }
+
+final class EncoderTests: XCTestCase {
+    private func engine(_ encoding: ControlEncoding, sink: SpySink, time: FakeTime) -> MappingEngine {
+        var config = Config.default
+        config.controls["P1"] = ControlDef(cc: 32, kind: .continuous, type: .cc, channel: 0, encoding: encoding)
+        return MappingEngine(config: config, sink: sink, now: time.now, schedule: time.schedule)
+    }
+
+    func testRelative64AccumulatesFromMidpoint() {
+        let time = FakeTime(), sink = SpySink()
+        let engine = engine(.relative64, sink: sink, time: time)
+        engine.handle(MIDIEvent(type: .cc, number: 32, value: 65, channel: 0))  // +1 → 65
+        XCTAssertEqual(sink.calls.last!.value!, 65.0 / 127.0, accuracy: 0.001)
+        time.advance(ms: 40)
+        engine.handle(MIDIEvent(type: .cc, number: 32, value: 63, channel: 0))  // -1 → 64
+        time.advance(ms: 40)
+        XCTAssertEqual(sink.calls.last!.value!, 64.0 / 127.0, accuracy: 0.001)
+    }
+
+    func testRelative2cDecodesNegatives() {
+        let time = FakeTime(), sink = SpySink()
+        let engine = engine(.relative2c, sink: sink, time: time)
+        engine.handle(MIDIEvent(type: .cc, number: 32, value: 127, channel: 0))  // -1 → 63
+        XCTAssertEqual(sink.calls.last!.value!, 63.0 / 127.0, accuracy: 0.001)
+    }
+
+    func testRelativeClampsAtEnds() {
+        let time = FakeTime(), sink = SpySink()
+        let engine = engine(.relative64, sink: sink, time: time)
+        for _ in 0..<80 {
+            engine.handle(MIDIEvent(type: .cc, number: 32, value: 66, channel: 0))  // +2 each
+            time.advance(ms: 40)
+        }
+        XCTAssertEqual(sink.calls.last!.value!, 1.0, accuracy: 0.001)
+    }
+}
