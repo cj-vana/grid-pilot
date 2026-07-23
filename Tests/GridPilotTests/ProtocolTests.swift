@@ -105,7 +105,7 @@ final class DeployerTests: XCTestCase {
         XCTAssertTrue(script.contains("p>=32 and p<=39"), "pots/faders CC 32-39")
         XCTAssertTrue(script.contains("p>=40 and p<=43"), "buttons notes 40-43")
         XCTAssertTrue(script.contains("for n=0,11 do"))
-        XCTAssertTrue(script.contains("c==0 and m==176"))
+        XCTAssertTrue(script.contains("c//4==0 and m==176"))
         XCTAssertLessThanOrEqual(script.utf8.count, 908)
     }
 
@@ -113,7 +113,7 @@ final class DeployerTests: XCTestCase {
         // EN16 above-right of head: x=1 → CC base 48, y=-1 → channel 12.
         let module = GridModule(x: 1, y: -1, hwcfg: 193, firmware: (1, 5, 5), lastSeen: Date())
         let script = try XCTUnwrap(LEDDeployer.systemSetupScript(for: module))
-        XCTAssertTrue(script.contains("c==12 and m==176 and p>=48 and p<=63"), script)
+        XCTAssertTrue(script.contains("c//4==3 and m==176 and p>=48 and p<=63"), script)
         XCTAssertTrue(script.contains("for n=0,15 do"))
         XCTAssertFalse(script.contains("m==144"), "EN16 has no buttons, no note branch")
     }

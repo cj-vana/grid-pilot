@@ -22,19 +22,21 @@ enum LEDDeployer {
         guard let elements = GridModuleCatalog.elements(hwcfg: module.hwcfg) else { return nil }
         let base = 32 + module.x * 16
         let count = elements.count
-        let channel = ((module.y * 4) % 16 + 16) % 16
+        // Channel = row*4 + page, and the page changes at runtime (utility
+        // button). c//4 isolates the row, so the guard survives page flips.
+        let row = ((module.y % 4) + 4) % 4
 
         // Contiguous button range (all catalog families keep buttons at the tail).
         let firstButton = elements.firstIndex(of: .button)
         let ccEnd = base + (firstButton ?? count) - 1
         let ccBranch = firstButton == 0
             ? ""
-            : "if c==\(channel) and m==176 and p>=\(base) and p<=\(ccEnd) then n=p-\(base) end "
+            : "if c//4==\(row) and m==176 and p>=\(base) and p<=\(ccEnd) then n=p-\(base) end "
         var noteBranch = ""
         if let firstButton {
             let noteStart = base + firstButton
             let noteEnd = base + count - 1
-            noteBranch = "if(m==144 or m==128)and p>=\(noteStart) and p<=\(noteEnd) then n=p-\(base) if m==128 then v=0 end end "
+            noteBranch = "if c//4==\(row) and(m==144 or m==128)and p>=\(noteStart) and p<=\(noteEnd) then n=p-\(base) if m==128 then v=0 end end "
         }
 
         return "--[[@cb]]"
