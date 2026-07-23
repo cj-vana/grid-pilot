@@ -15,3 +15,15 @@ Initial release.
   detection via Notification Center (Full Disk Access) or manual trigger.
 - `gridpilot` CLI: ai, notify, rollback, doctor, schema.
 - Config hot-reload on hand edits, with validation gate.
+
+## 0.2.0 (2026-07-23)
+
+- Speaks the Grid serial protocol directly (v1.5.5, byte-validated against
+  Intech's reference): module discovery, config read/write with read-back
+  verification, flash store. No Grid Editor required.
+- `gridpilot setup-leds`: one-command LED theme deployment to every module.
+- `gridpilot generate-map` / Detect Modules: auto-add controls for chained
+  modules using the dynamic layout formulas.
+- Six LED themes with level-true switching; channel-aware controls for
+  multi-module chains; named config presets; relative encoder decode modes;
+  Series 3 compatibility (verified same protocol + layouts).

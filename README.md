@@ -121,12 +121,20 @@ Continuous shell and AppleScript actions get template substitution: `{{value}}` 
 ```
 gridpilot                        menu-bar app
 gridpilot ai "<request>" [--yes] AI config edit
+gridpilot preset list|save|load  named config snapshots
+gridpilot modules                discover the module chain over serial
+gridpilot setup-leds             deploy LED themes, no Grid Editor needed
+gridpilot generate-map           add controls for every detected module
 gridpilot notify --event <name>  ping the running app
 gridpilot rollback               restore last config backup
 gridpilot doctor                 health check
 gridpilot schema                 print the AI schema
 gridpilot config-path            print config location
 ```
+
+The serial commands (`modules`, `setup-leds`, `generate-map`) talk the Grid
+protocol directly over USB-CDC — quit Grid Editor first, the port is
+exclusive. Protocol notes: [docs/grid-serial-protocol.md](docs/grid-serial-protocol.md).
 
 ## Troubleshooting
 
@@ -156,7 +164,7 @@ The flow is `MIDIListener → MappingEngine → ActionRegistry`. Adding a builti
 
 Built for the PBF4, but nothing is PBF4-specific: controls are named CC/note+channel entries in the config. Other Grid modules (or non-Grid controllers) work if you run learn mode and adjust the control names.
 
-**Module chains:** chained Grid modules appear as one MIDI device. Each module offsets its numbers by position — CC block = 32 + column × 16, channel = row × 4 + page — so multi-module configs just add controls with the right channel set (e.g. `"M2.P1": { "cc": 32, "channel": 12, ... }`). Identity is positional: re-plugging USB into a different module remaps the chain, so keep the cable in the same module.
+**Module chains:** chained Grid modules appear as one MIDI device. Each module offsets its numbers by position — CC block = 32 + column × 16, channel = row × 4 + page. Run `gridpilot generate-map` (or menu → Detect Modules → Update Config) and every detected module's controls are added to the config automatically, named like `M1,0-E5`; assign them actions via the AI. Identity is positional: re-plugging USB into a different module remaps the chain, so keep the cable in the same module.
 
 **Series 3:** legacy and Series 3 modules chain together and use identical MIDI layouts, so both generations work as-is. Series 3 Hall-effect buttons default to plain press/release; if you configure velocity or pressure modes in Grid Editor, the values ride the same CC/note and map cleanly onto continuous actions. Endless encoders (EN16, EF44, TEK2, VSN1) default to absolute output; if a profile opts into a relative mode, set the control's `encoding` to `relative64` or `relative2c` and GridPilot accumulates steps into a position.
 

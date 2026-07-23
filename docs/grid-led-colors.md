@@ -21,7 +21,25 @@ Incoming button notes (GridPilot's call-mode ring flash) drive button LED
 phase directly. Requires firmware 1.5+ (the mid-color function); Grid Editor
 will prompt you to update older modules.
 
-## One-time setup in Grid Editor
+## One-command setup (recommended)
+
+```sh
+gridpilot setup-leds
+```
+
+GridPilot talks to the module directly over serial (quit Grid Editor first —
+the port is exclusive): it detects every module in the chain, writes the
+theme handler and color-stripped element scripts where it has verified
+templates (PBF4, PO16, BU16), verifies each write by reading it back, and
+stores to flash. Idempotent — re-running it changes nothing if you're
+already set up. Also available from the menu bar: **Set Up Module LEDs**.
+
+For module families without verified element templates (EN16, EF44, TEK2,
+VSN), the theme handler still deploys, but the stock per-element color
+blocks need the manual cleanup below (once) — or send a PR with fetched
+templates from your hardware.
+
+## Manual setup in Grid Editor (fallback/reference)
 
 Two parts, both required.
 

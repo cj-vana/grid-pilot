@@ -165,6 +165,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         menu.addItem(.separator())
 
         menu.addItem(item("Learn Controls…", #selector(startLearn), key: ""))
+        menu.addItem(item("Set Up Module LEDs", #selector(deployLEDs), key: ""))
+        menu.addItem(item("Detect Modules → Update Config", #selector(detectModules), key: ""))
         menu.addItem(item("Open Config", #selector(openConfig), key: ""))
         menu.addItem(item("View Log", #selector(openLog), key: ""))
 
@@ -331,6 +333,57 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     @objc private func startLearn() {
         appDelegate?.startLearnMode()
+    }
+
+    @objc private func deployLEDs() {
+        runSerialTask(title: "Set Up Module LEDs") { client in
+            let report = LEDDeployer.deploy(client: client)
+            DispatchQueue.main.async { self.appDelegate?.sendLEDTheme() }
+            return (report.lines.joined(separator: "\n"), !report.failed)
+        }
+    }
+
+    @objc private func detectModules() {
+        runSerialTask(title: "Detect Modules") { client in
+            let modules = client.modules
+            guard !modules.isEmpty else { return ("no module heartbeats received", false) }
+            var summary = modules.map { "\($0.name) at (\($0.x),\($0.y)) fw \($0.firmware.major).\($0.firmware.minor).\($0.firmware.patch)" }
+            let (merged, added) = MapGenerator.merge(into: self.store.config, modules: modules)
+            if added.isEmpty {
+                summary.append("config already covers every module")
+            } else {
+                do {
+                    try self.store.apply(merged, backup: true)
+                    summary.append("added controls: \(added.joined(separator: ", "))")
+                    summary.append("assign actions via Customize with AI")
+                } catch {
+                    return (error.localizedDescription, false)
+                }
+            }
+            return (summary.joined(separator: "\n"), true)
+        }
+    }
+
+    /// Serial ops run off-main; results land in a single alert. The port is
+    /// exclusive, so failures usually mean Grid Editor is running.
+    private func runSerialTask(title: String, work: @escaping (GridConfigClient) -> (String, Bool)) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let outcome: (String, Bool)
+            if let client = GridConfigClient.openFirstAvailable() {
+                Thread.sleep(forTimeInterval: 1.5)  // gather heartbeats
+                outcome = work(client)
+                client.stop()
+            } else {
+                outcome = ("could not open the Grid's serial port — quit Grid Editor if it's running, and check the USB cable", false)
+            }
+            DispatchQueue.main.async {
+                let alert = NSAlert()
+                alert.messageText = "\(title): \(outcome.1 ? "done" : "failed")"
+                alert.informativeText = outcome.0
+                NSApp.activate(ignoringOtherApps: true)
+                alert.runModal()
+            }
+        }
     }
 
     @objc private func openConfig() {
