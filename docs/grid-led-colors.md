@@ -60,11 +60,6 @@ below, Commit, then click **Store** so it survives power cycles.
 self.T={{0,60,255,170,0,255,255,30,0},{0,10,80,0,190,190,200,255,255},{80,0,160,255,0,120,255,150,0},{0,20,0,0,180,30,120,255,80},{20,0,0,255,60,0,255,220,0},{10,10,10,120,120,120,255,255,255}}
 -- Last seen value per element, so theme switches keep true LED levels.
 self.q={}
--- F interpolates one color channel (o = 1/2/3) at value v across the anchors,
--- matching the firmware's min→mid→max rendering. Needed because palette writes
--- repaint the LED with the last anchor written; on a theme switch we compute
--- and set the true current color ourselves.
-self.F=function(t,v,o) local a,b,f if v<64 then a=o b=o+3 f=v*2 else a=o+3 b=o+6 f=(v-64)*2 end return t[a]+((t[b]-t[a])*f)//127 end
 self.midirx_cb=function(s,h,e)
   local c,m,p,v=e[1],e[2],e[3],e[4]
   if c==15 and m==176 and p==20 then
@@ -73,9 +68,7 @@ self.midirx_cb=function(s,h,e)
       gln(n,1,t[1],t[2],t[3])
       gld(n,1,t[4],t[5],t[6])
       glx(n,1,t[7],t[8],t[9])
-      local q=s.q[n] or 0
-      glc(n,1,s.F(t,q,1),s.F(t,q,2),s.F(t,q,3))
-      glp(n,1,q*2)
+      glp(n,1,(s.q[n] or 0)*2)
     end
     return
   end
@@ -93,11 +86,15 @@ end
 ```
 
 (`gln`/`gld`/`glx` are `led_color_min`/`led_color_mid`/`led_color_max`;
-`glp` is `led_value`. The firmware interpolates min→mid→max as levels move.)
+`glp` is `led_value`. The firmware re-blends the three anchors by phase on
+every frame, so setting anchors plus phase is the whole job.) Do not add
+`led_color` (`glc`) to the loop: it doesn't set the displayed color, it
+rewrites all three anchors to `{c/20, c/2, c}` and flattens the gradient —
+with a control at zero that strands every LED near the theme's minimum color.
 GridPilot's echo (`leds.echo`) feeds the element branch; after each theme
 switch GridPilot also replays every control's last known value so LEDs light
-at real positions. LEDs are dark for controls the module hasn't heard since
-power-up — move them once.
+at real positions. Controls the module hasn't heard since power-up idle at
+the theme's zero color until moved once.
 
 ## Notes
 

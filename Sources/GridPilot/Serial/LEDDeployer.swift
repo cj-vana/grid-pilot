@@ -39,13 +39,16 @@ enum LEDDeployer {
             noteBranch = "if c//4==\(row) and(m==144 or m==128)and p>=\(noteStart) and p<=\(noteEnd) then n=p-\(base) if m==128 then v=0 end end "
         }
 
+        // The renderer re-blends gln/gld/glx by phase every frame, so setting
+        // anchors + phase is the whole job. Never add glc here: firmware's
+        // led_color rewrites all three anchors to {c/20, c/2, c}, flattening
+        // the gradient (at value 0 that leaves LEDs stuck near the min color).
         return "--[[@cb]]"
             + "self.T=\(paletteTable)self.q={}"
-            + "self.F=function(t,v,o)local a,b,f if v<64 then a=o b=o+3 f=v*2 else a=o+3 b=o+6 f=(v-64)*2 end return t[a]+((t[b]-t[a])*f)//127 end "
             + "self.midirx_cb=function(s,h,e)local c,m,p,v=e[1],e[2],e[3],e[4]"
             + "if c==15 and m==176 and p==20 then local t=s.T[v+1]or s.T[1]for n=0,\(count - 1) do "
             + "gln(n,1,t[1],t[2],t[3])gld(n,1,t[4],t[5],t[6])glx(n,1,t[7],t[8],t[9])"
-            + "local q=s.q[n]or 0 glc(n,1,s.F(t,q,1),s.F(t,q,2),s.F(t,q,3))glp(n,1,q*2)end return end "
+            + "glp(n,1,(s.q[n]or 0)*2)end return end "
             + "local n=-1 \(ccBranch)\(noteBranch)"
             + "if n>=0 then s.q[n]=v glp(n,1,v*2)end end"
     }

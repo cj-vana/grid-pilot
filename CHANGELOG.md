@@ -27,3 +27,7 @@ Initial release.
 - Six LED themes with level-true switching; channel-aware controls for
   multi-module chains; named config presets; relative encoder decode modes;
   Series 3 compatibility (verified same protocol + layouts).
+- Fixed: theme handler no longer calls `led_color`, which rewrites the
+  min/mid/max palette anchors and flattened the gradient — worst with
+  controls at zero on app start (LEDs stuck near the theme's darkest color).
+  Re-run `gridpilot setup-leds` once to push the corrected handler.

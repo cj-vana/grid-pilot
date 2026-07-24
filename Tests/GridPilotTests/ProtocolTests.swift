@@ -129,6 +129,15 @@ final class DeployerTests: XCTestCase {
         let module = GridModule(x: 0, y: 0, hwcfg: 161, firmware: (1, 5, 5), lastSeen: Date())
         XCTAssertNil(LEDDeployer.systemSetupScript(for: module))
     }
+
+    func testThemeHandlerNeverCallsLedColor() throws {
+        // Firmware's led_color (glc) rewrites all three palette anchors to
+        // {c/20, c/2, c}, wiping the gradient the handler just set — at value
+        // 0 that flattens every LED to shades of the theme's min color.
+        let module = GridModule(x: 0, y: 0, hwcfg: 65, firmware: (1, 5, 5), lastSeen: Date())
+        let script = try XCTUnwrap(LEDDeployer.systemSetupScript(for: module))
+        XCTAssertFalse(script.contains("glc("), script)
+    }
 }
 
 final class MapGeneratorTests: XCTestCase {
