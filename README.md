@@ -1,10 +1,12 @@
 # GridPilot
 
-Turn an [Intech Studio Grid PBF4](https://intech.studio) into a control surface for your Mac: Spotify on a fader, Claude Code and Codex on buttons, brightness and audio routing on knobs, and an AI layer that reconfigures all of it from a plain English sentence.
+Turn an [Intech Studio Grid](https://intech.studio) controller into a control surface for your Mac: Spotify on a fader, Claude Code and Codex on buttons, brightness and audio routing on knobs, and an AI layer that reconfigures all of it from a plain English sentence.
 
 No Electron, no dependencies. One Swift menu-bar app.
 
 ## What it does out of the box
+
+The default mapping targets a PBF4; other modules and chains get controls via learn mode or `gridpilot generate-map` (see Hardware notes).
 
 | Control | Action |
 |---------|--------|
@@ -25,7 +27,7 @@ Buttons are context-aware. The interrupt button checks which app is frontmost an
 
 ### LED color themes
 
-The Grid's RGB LEDs can track your control positions live, with four palettes (Heat, Ocean, Synthwave, Matrix) switchable from the menu bar. GridPilot echoes values back to the module automatically; a one-time Grid Editor snippet does the painting. See [docs/grid-led-colors.md](docs/grid-led-colors.md).
+The Grid's RGB LEDs can track your control positions live, with six palettes (Heat, Ocean, Synthwave, Matrix, Lava, Mono) switchable from the menu bar. `gridpilot setup-leds` deploys the LED handler to every module in the chain over serial, no Grid Editor needed — fully automatic on PBF4/PO16/BU16, one manual color cleanup on EN16/EF44/TEK2. See [docs/grid-led-colors.md](docs/grid-led-colors.md).
 
 ### Incoming call mode
 
@@ -153,12 +155,14 @@ Sources/GridPilot/
   Actions/   ActionRegistry dispatch, CoreAudio, AppleScript, CGEvent keystrokes,
              private-API wrappers (isolated, fail-soft)
   AI/        Prompt building, provider argv, JSON extraction, validation chain
+  Serial/    Grid protocol over USB-CDC: module discovery, verified config
+             read/write, LED theme deploy, control-map generation
   App/       Menu bar, learn mode, customize window, call mode, CLI
 ```
 
 The flow is `MIDIListener → MappingEngine → ActionRegistry`. Adding a builtin action is one entry in `Builtins.all` plus one case in `ActionRegistry.run`; the validator and AI schema pick it up automatically.
 
-`swift test` runs 54 tests with no hardware attached (fake clocks, spy executors, stubbed AI runners). See [CONTRIBUTING.md](CONTRIBUTING.md).
+`swift test` runs 78 tests with no hardware attached (fake clocks, spy executors, stubbed AI runners). See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Hardware notes
 

@@ -1,9 +1,9 @@
 # LED color themes
 
-The PBF4's LEDs are full RGB. Out of the box the module only uses its stock
+Grid module LEDs are full RGB. Out of the box a module only uses its stock
 palette locally; it does not react to incoming MIDI. This one-time setup makes
-LED color and brightness track your control positions live, with six themes
-switchable from the GridPilot menu bar (LED Theme):
+LED color and brightness track your control positions live, on every module in
+the chain, with six themes switchable from the GridPilot menu bar (LED Theme):
 
 - **Heat** — blue at zero, purple in the middle, red at max
 - **Ocean** — deep navy through teal toward foam white
@@ -28,16 +28,23 @@ gridpilot setup-leds
 ```
 
 GridPilot talks to the module directly over serial (quit Grid Editor first —
-the port is exclusive): it detects every module in the chain, writes the
-theme handler and color-stripped element scripts where it has verified
-templates (PBF4, PO16, BU16), verifies each write by reading it back, and
-stores to flash. Idempotent — re-running it changes nothing if you're
-already set up. Also available from the menu bar: **Set Up Module LEDs**.
+the port is exclusive): it detects every module in the chain, writes each
+one a theme handler with MIDI ranges derived from its position, verifies
+every write by reading it back, and stores to flash. Idempotent — re-running
+it changes nothing if you're already set up. Also available from the menu
+bar: **Set Up Module LEDs**.
 
-For module families without verified element templates (EN16, EF44, TEK2,
-VSN), the theme handler still deploys, but the stock per-element color
-blocks need the manual cleanup below (once) — or send a PR with fetched
-templates from your hardware.
+Per-family support:
+
+- **PBF4, PO16, BU16** — fully automatic. The theme handler deploys and the
+  stock per-element color blocks are stripped using templates fetched from
+  real hardware.
+- **EN16, EF44, TEK2** — the theme handler deploys, but the stock color
+  blocks need the manual cleanup below (once) — or send a PR with fetched
+  templates from your hardware.
+- **PB44, TEK1, VSN, OCTV, XY** — no verified element layout yet, so
+  `setup-leds` skips them; control mapping via learn mode still works.
+  PRs with layouts welcome.
 
 ## Manual setup in Grid Editor (fallback/reference)
 
@@ -98,9 +105,12 @@ the theme's zero color until moved once.
 
 ## Notes
 
-- The snippet assumes the default MIDI layout (CC 32-39 for pots/faders,
-  notes 40-43 for buttons). If learn mode captured different numbers, adjust
-  the two range checks to match `~/.config/gridpilot/config.json`.
+- The snippet assumes a head PBF4 with the default MIDI layout (CC 32-39 for
+  pots/faders, notes 40-43 for buttons). Chained modules shift by position —
+  CC block = 32 + column × 16, plus a row guard on the channel — which
+  `setup-leds` derives per module. Adjust the range checks by hand only if
+  learn mode captured different numbers
+  (`~/.config/gridpilot/config.json`).
 - Buttons idle at a dim theme color and go full-bright while held; call mode's
   ring flash becomes theme-colored blinking automatically.
 - Add your own theme: extend the `if t ==` chain with another palette and it
