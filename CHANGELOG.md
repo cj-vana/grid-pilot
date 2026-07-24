@@ -31,3 +31,17 @@ Initial release.
   min/mid/max palette anchors and flattened the gradient — worst with
   controls at zero on app start (LEDs stuck near the theme's darkest color).
   Re-run `gridpilot setup-leds` once to push the corrected handler.
+
+## 0.3.0 (2026-07-23)
+
+- Model pickers: the AI Provider menu now lists known codex and Claude models
+  per provider with the active one checked; Custom… still accepts any id.
+- Claude Opus 5 (`claude-opus-5`) is now the Claude default, and is in the
+  picker list. Existing configs keep whatever model they already name; switch
+  from AI Provider → claude model, or edit the config.
+- Fixed: rebuilds no longer invalidate Accessibility/Automation/Full Disk
+  Access grants. The app bundle was ad-hoc signed, so each build had a new
+  code hash and macOS re-prompted for permissions that Settings showed as
+  already granted. make-app.sh now signs with a Developer ID / Apple
+  Development certificate when the keychain has one. After updating, remove
+  and re-grant GridPilot's permissions once; they stick from then on.

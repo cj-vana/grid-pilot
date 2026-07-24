@@ -59,8 +59,8 @@ Pick your provider and model in the config:
 ```json
 "ai": {
   "provider": "codex",
-  "codex":  { "model": "gpt-5.6-sol",    "effort": "high"  },
-  "claude": { "model": "claude-opus-4-8", "effort": "xhigh" }
+  "codex":  { "model": "gpt-5.6-sol",   "effort": "high"  },
+  "claude": { "model": "claude-opus-5", "effort": "xhigh" }
 }
 ```
 

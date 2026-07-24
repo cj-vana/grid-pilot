@@ -33,5 +33,11 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-codesign --force --sign - "$APP"
-echo "built $APP"
+# Ad-hoc signatures hash the exact binary, so every rebuild invalidates TCC
+# grants (Accessibility, Automation, Full Disk Access) and macOS re-prompts
+# even though System Settings still shows GridPilot enabled. A real identity
+# keeps grants across rebuilds; ad-hoc is the fallback.
+IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null \
+    | awk -F'"' '/Developer ID Application|Apple Development/ {print $2; exit}')
+codesign --force --sign "${IDENTITY:--}" "$APP"
+echo "built $APP (signed: ${IDENTITY:-ad-hoc})"

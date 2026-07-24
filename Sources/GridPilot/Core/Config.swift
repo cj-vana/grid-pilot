@@ -278,7 +278,7 @@ struct Config: Codable, Equatable {
             ai: AIConfig(
                 provider: "codex",
                 codex: AIProviderConfig(model: "gpt-5.6-sol", effort: "high"),
-                claude: AIProviderConfig(model: "claude-opus-4-8", effort: "xhigh")
+                claude: AIProviderConfig(model: "claude-opus-5", effort: "xhigh")
             ),
             notify: NotifyConfig(flashIcon: true, midiOut: []),
             contextKeys: [

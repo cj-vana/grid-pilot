@@ -112,9 +112,24 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
         providerMenu.addItem(.separator())
         for name in ["codex", "claude"] {
-            let modelItem = NSMenuItem(title: "Set \(name) model…", action: #selector(promptModel(_:)), keyEquivalent: "")
-            modelItem.target = self
-            modelItem.representedObject = name
+            let modelItem = NSMenuItem(title: "\(name) model", action: nil, keyEquivalent: "")
+            let modelMenu = NSMenu()
+            let currentModel = name == "codex" ? store.config.ai.codex.model : store.config.ai.claude.model
+            var models = Self.knownModels[name] ?? []
+            if !models.contains(currentModel) { models.insert(currentModel, at: 0) }
+            for model in models {
+                let entry = NSMenuItem(title: model, action: #selector(setModel(_:)), keyEquivalent: "")
+                entry.target = self
+                entry.representedObject = [name, model]
+                entry.state = currentModel == model ? .on : .off
+                modelMenu.addItem(entry)
+            }
+            modelMenu.addItem(.separator())
+            let custom = NSMenuItem(title: "Custom…", action: #selector(promptModel(_:)), keyEquivalent: "")
+            custom.target = self
+            custom.representedObject = name
+            modelMenu.addItem(custom)
+            providerMenu.setSubmenu(modelMenu, for: modelItem)
             providerMenu.addItem(modelItem)
 
             let effortItem = NSMenuItem(title: "\(name) effort", action: nil, keyEquivalent: "")
@@ -232,6 +247,12 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         return text.count > 32 ? String(text.prefix(32)) + "…" : text
     }
 
+    /// Menu shortcuts only — the config takes any id the CLI accepts (Custom…).
+    private static let knownModels: [String: [String]] = [
+        "codex": ["gpt-5.6-sol", "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex-spark"],
+        "claude": ["claude-fable-5", "claude-opus-5", "claude-opus-4-8", "claude-sonnet-5", "claude-haiku-4-5-20251001"],
+    ]
+
     private func providerLabel(_ name: String) -> String {
         let ai = store.config.ai
         let p = name == "codex" ? ai.codex : ai.claude
@@ -321,6 +342,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let model = field.stringValue.trimmingCharacters(in: .whitespaces)
         guard !model.isEmpty else { return }
         if provider == "codex" { config.ai.codex.model = model } else { config.ai.claude.model = model }
+        try? store.apply(config, backup: false)
+    }
+
+    @objc private func setModel(_ sender: NSMenuItem) {
+        guard let pair = sender.representedObject as? [String], pair.count == 2 else { return }
+        var config = store.config
+        if pair[0] == "codex" { config.ai.codex.model = pair[1] } else { config.ai.claude.model = pair[1] }
         try? store.apply(config, backup: false)
     }
 

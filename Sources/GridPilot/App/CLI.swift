@@ -64,7 +64,7 @@ enum CLI {
         }
     }
 
-    static let appVersion = "0.2.0"
+    static let appVersion = "0.3.0"
 
     private static func ai(request: String, autoConfirm: Bool) -> Int32 {
         guard !request.isEmpty else {

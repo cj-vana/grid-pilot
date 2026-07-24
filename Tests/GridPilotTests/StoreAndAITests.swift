@@ -184,7 +184,7 @@ final class AITests: XCTestCase {
         claude.provider = "claude"
         let claudeArgv = AICustomizer.argv(for: claude, outFile: out)
         XCTAssertEqual(claudeArgv.first, "claude")
-        XCTAssertTrue(claudeArgv.contains("claude-opus-4-8"))
+        XCTAssertTrue(claudeArgv.contains("claude-opus-5"))
         XCTAssertTrue(claudeArgv.contains("xhigh"))
     }
 
