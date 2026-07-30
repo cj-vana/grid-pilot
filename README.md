@@ -27,7 +27,7 @@ Buttons are context-aware. The interrupt button checks which app is frontmost an
 
 ### LED color themes
 
-The Grid's RGB LEDs can track your control positions live, with six palettes (Heat, Ocean, Synthwave, Matrix, Lava, Mono) switchable from the menu bar. `gridpilot setup-leds` deploys the LED handler to every module in the chain over serial, no Grid Editor needed — fully automatic on PBF4/PO16/BU16, one manual color cleanup on EN16/EF44/TEK2. See [docs/grid-led-colors.md](docs/grid-led-colors.md).
+The Grid's RGB LEDs can track your control positions live, with six palettes (Heat, Ocean, Synthwave, Matrix, Lava, Mono) switchable from the menu bar. `gridpilot setup-leds` deploys the LED handler and removes conflicting stock color actions on every known module in the chain over serial—no Grid Editor needed. See [docs/grid-led-colors.md](docs/grid-led-colors.md).
 
 ### Incoming call mode
 

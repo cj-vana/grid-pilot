@@ -32,7 +32,7 @@ enum MapGenerator {
                     letter = "E"
                     kind = .continuous
                     type = .cc
-                case .touch:
+                case .touch, .lcd:
                     continue
                 }
                 counters[letter, default: 0] += 1

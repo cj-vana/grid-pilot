@@ -133,8 +133,48 @@ final class DeployerTests: XCTestCase {
         XCTAssertLessThanOrEqual(script.utf8.count, GridConfigClient.maxActionLength)
     }
 
+    func testEveryCatalogedFamilyGetsABoundedThemeHandler() throws {
+        let families: [(name: String, hwcfg: Int)] = [
+            ("PO16", 3), ("BU16", 131), ("EN16", 195), ("EF44", 35),
+            ("PBF4", 67), ("PB44", 145), ("TEK1", 225), ("TEK2", 27),
+            ("VSN1L", 59), ("VSN1R", 91), ("VSN2", 123),
+            ("OCTV", 211), ("XY", 161),
+        ]
+        for family in families {
+            let module = GridModule(x: 0, y: 0, hwcfg: family.hwcfg, firmware: (1, 5, 5), lastSeen: Date())
+            let script = try XCTUnwrap(LEDDeployer.systemSetupScript(for: module), family.name)
+            XCTAssertLessThanOrEqual(script.utf8.count, GridConfigClient.maxActionLength, family.name)
+        }
+    }
+
+    func testLCDModulesExcludeScreensFromLEDCalls() throws {
+        let tek1 = GridModule(x: 0, y: 0, hwcfg: 225, firmware: (1, 5, 5), lastSeen: Date())
+        let vsn2 = GridModule(x: 0, y: 0, hwcfg: 123, firmware: (1, 5, 5), lastSeen: Date())
+        XCTAssertTrue(try XCTUnwrap(LEDDeployer.systemSetupScript(for: tek1)).contains("self.L={[13]=1}"))
+        XCTAssertTrue(try XCTUnwrap(LEDDeployer.systemSetupScript(for: vsn2)).contains("self.L={[12]=1,[17]=1}"))
+    }
+
+    func testSimpleColorRemovalPreservesEveryOtherAction() {
+        let script = "--[[@cb]]custom()--[[@sglc]]self:glc(-1,{{-1,-1,-1,1}})self:glp(-1,-1)--[[@gms]]self:gms(2,176,40,99)"
+        XCTAssertEqual(
+            LEDDeployer.removingSimpleColor(from: script),
+            "--[[@cb]]custom()--[[@gms]]self:gms(2,176,40,99)"
+        )
+        XCTAssertEqual(LEDDeployer.removingSimpleColor(from: "--[[@cb]]custom()"), "--[[@cb]]custom()")
+        XCTAssertEqual(LEDDeployer.removingSimpleColor(from: "--[[@sglc]]self:glp(-1,-1)"), "")
+    }
+
+    func testColorEventsCoverEveryLEDControlType() {
+        XCTAssertEqual(LEDDeployer.colorEventIDs(for: .potmeter), [1])
+        XCTAssertEqual(LEDDeployer.colorEventIDs(for: .encoder), [2, 3])
+        XCTAssertEqual(LEDDeployer.colorEventIDs(for: .button), [3])
+        XCTAssertEqual(LEDDeployer.colorEventIDs(for: .endless), [7, 3])
+        XCTAssertEqual(LEDDeployer.colorEventIDs(for: .touch), [9])
+        XCTAssertEqual(LEDDeployer.colorEventIDs(for: .lcd), [])
+    }
+
     func testUnknownModuleReturnsNil() {
-        let module = GridModule(x: 0, y: 0, hwcfg: 161, firmware: (1, 5, 5), lastSeen: Date())
+        let module = GridModule(x: 0, y: 0, hwcfg: 254, firmware: (1, 5, 5), lastSeen: Date())
         XCTAssertNil(LEDDeployer.systemSetupScript(for: module))
     }
 
@@ -178,6 +218,30 @@ final class MapGeneratorTests: XCTestCase {
 
         let (_, added) = MapGenerator.merge(into: .default, modules: [tek2])
         XCTAssertEqual(added.count, 10, "TEK2 controls must not collide with the default PBF4 map")
+    }
+
+    func testCatalogIncludesEveryPublishedModuleLayout() {
+        let layouts: [(hwcfg: Int, elements: Int, controls: Int)] = [
+            (3, 16, 16), (131, 16, 16), (195, 16, 16), (35, 8, 8),
+            (67, 12, 12), (145, 16, 16), (225, 14, 13), (27, 10, 10),
+            (59, 14, 13), (91, 14, 13), (123, 18, 16), (211, 21, 21),
+            (161, 5, 0),
+        ]
+        for layout in layouts {
+            let elements = GridModuleCatalog.elements(hwcfg: layout.hwcfg)
+            XCTAssertEqual(elements?.count, layout.elements, "hwcfg \(layout.hwcfg)")
+            let module = GridModule(x: 0, y: 0, hwcfg: layout.hwcfg, firmware: (1, 5, 5), lastSeen: Date())
+            XCTAssertEqual(MapGenerator.controls(for: [module]).count, layout.controls, "hwcfg \(layout.hwcfg)")
+        }
+    }
+
+    func testLCDSlotsDoNotShiftLaterVSN2Buttons() {
+        let module = GridModule(x: 0, y: 0, hwcfg: 123, firmware: (1, 5, 5), lastSeen: Date())
+        let controls = MapGenerator.controls(for: [module])
+        XCTAssertNil(controls.values.first { $0.cc == 44 }, "element 12 is an LCD")
+        XCTAssertEqual(controls["M0,0-B13"], ControlDef(cc: 45, kind: .button, type: .note, channel: 0))
+        XCTAssertEqual(controls["M0,0-B16"], ControlDef(cc: 48, kind: .button, type: .note, channel: 0))
+        XCTAssertNil(controls.values.first { $0.cc == 49 }, "element 17 is an LCD")
     }
 
     func testMergePreservesExistingAndReportsAdded() {

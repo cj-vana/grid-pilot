@@ -34,19 +34,12 @@ every write by reading it back, and stores to flash. Idempotent — re-running
 it changes nothing if you're already set up. Also available from the menu
 bar: **Set Up Module LEDs**.
 
-Per-family support:
+All cataloged families are automatic: **PBF4, PO16, BU16, EN16, EF44, TEK1,
+TEK2, VSN1L/R, VSN2, PB44, OCTV, and XY**. GridPilot removes only the marked
+Simple Color action from each applicable event, preserving custom modes and
+MIDI actions. LCD elements are intentionally left alone.
 
-- **PBF4, PO16, BU16** — fully automatic. The theme handler deploys and the
-  stock per-element color blocks are stripped using templates fetched from
-  real hardware.
-- **EN16, EF44, TEK2** — the theme handler deploys, but the stock color
-  blocks need the manual cleanup below (once) — or send a PR with fetched
-  templates from your hardware.
-- **PB44, TEK1, VSN, OCTV, XY** — no verified element layout yet, so
-  `setup-leds` skips them; control mapping via learn mode still works.
-  PRs with layouts welcome.
-
-## Manual setup in Grid Editor (fallback/reference)
+## Manual setup in Grid Editor (fallback/reference only)
 
 Two parts, both required.
 

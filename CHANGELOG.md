@@ -7,6 +7,9 @@
   collide with the default PBF4 map and be silently omitted.
 - Fixed TEK2 LED feedback ranges so button notes and encoder CCs target their
   actual element indices.
+- `setup-leds` now removes conflicting Simple Color actions itself for every
+  cataloged module family, preserving other event actions and eliminating the
+  one-time Grid Editor cleanup.
 
 ## 0.1.0 (2026-07-23)
 

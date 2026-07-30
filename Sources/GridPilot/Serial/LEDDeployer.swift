@@ -1,20 +1,36 @@
 import Foundation
 
 /// Generates and deploys the LED theme setup to Grid modules over serial —
-/// no Grid Editor involved. Scripts are byte-identical to what the editor
-/// stores (templates fetched from real hardware), writes are verified by
-/// read-back, and identical content is skipped.
+/// no Grid Editor involved. Stock Simple Color blocks are removed in place so
+/// custom modes and MIDI actions survive; writes are verified by read-back.
 enum LEDDeployer {
-    /// Default element event scripts with LED color stripped (mode + Auto
-    /// MIDI, no Simple Color). Fetched verbatim from a PBF4 on fw 1.5.5.
-    static let potEventScript = "--[[@spc]]self:pmo(7)self:pmi(0)self:pma(127)--[[@gms]]self:gms(-1,-1,-1,-1)"
-    static let buttonEventScript = "--[[@sbc]]self:bmo(0)self:bmi(0)self:bma(127)--[[@gms]]self:gms(-1,-1,-1,-1)"
-
-    /// Families where we know the element templates well enough to rewrite
-    /// element events (verified on hardware or byte-compatible with it).
-    static let elementRewriteFamilies: Set<String> = ["PBF4", "PO16", "BU16"]
-
     static let paletteTable = "{{0,60,255,170,0,255,255,30,0},{0,10,80,0,190,190,200,255,255},{80,0,160,255,0,120,255,150,0},{0,20,0,0,180,30,120,255,80},{20,0,0,255,60,0,255,220,0},{10,10,10,120,120,120,255,255,255}}"
+
+    /// Main value-producing events that may contain a Simple Color action.
+    /// Event ids come from the protocol's elementEvents table.
+    static func colorEventIDs(for element: GridElementType) -> [Int] {
+        switch element {
+        case .potmeter: return [1]
+        case .encoder: return [2, 3]
+        case .button: return [3]
+        case .endless: return [7, 3]
+        case .touch: return [9]
+        case .lcd: return []
+        }
+    }
+
+    /// Removes only editor-generated Simple Color blocks. Block markers make
+    /// this safe without understanding or replacing the surrounding actions.
+    static func removingSimpleColor(from script: String) -> String {
+        var result = script
+        let marker = "--[[@sglc]]"
+        while let color = result.range(of: marker) {
+            let remainder = result[color.upperBound...]
+            let end = remainder.range(of: "--[[@")?.lowerBound ?? result.endIndex
+            result.removeSubrange(color.lowerBound..<end)
+        }
+        return result
+    }
 
     /// Theme handler for a module, with number ranges derived from its
     /// position and family layout (cc = 32 + x*16 + element).
@@ -22,6 +38,8 @@ enum LEDDeployer {
         guard let elements = GridModuleCatalog.elements(hwcfg: module.hwcfg) else { return nil }
         let base = 32 + module.x * 16
         let count = elements.count
+        let lcdIndices = elements.indices.filter { elements[$0] == .lcd }
+        let lcdTable = lcdIndices.map { "[\($0)]=1" }.joined(separator: ",")
         // Channel = row*4 + page, and the page changes at runtime (utility
         // button). c//4 isolates the row, so the guard survives page flips.
         let row = ((module.y % 4) + 4) % 4
@@ -30,7 +48,7 @@ enum LEDDeployer {
             elements.indices.filter {
                 switch elements[$0] {
                 case .potmeter, .encoder, .endless: return true
-                case .button, .touch: return false
+                case .button, .touch, .lcd: return false
                 }
             }
         )
@@ -47,11 +65,11 @@ enum LEDDeployer {
         // led_color rewrites all three anchors to {c/20, c/2, c}, flattening
         // the gradient (at value 0 that leaves LEDs stuck near the min color).
         return "--[[@cb]]"
-            + "self.T=\(paletteTable)self.q={}"
+            + "self.T=\(paletteTable)self.q={}self.L={\(lcdTable)}"
             + "self.midirx_cb=function(s,h,e)local c,m,p,v=e[1],e[2],e[3],e[4]"
             + "if c==15 and m==176 and p==20 then local t=s.T[v+1]or s.T[1]for n=0,\(count - 1) do "
-            + "gln(n,1,t[1],t[2],t[3])gld(n,1,t[4],t[5],t[6])glx(n,1,t[7],t[8],t[9])"
-            + "glp(n,1,(s.q[n]or 0)*2)end return end "
+            + "if not s.L[n]then gln(n,1,t[1],t[2],t[3])gld(n,1,t[4],t[5],t[6])glx(n,1,t[7],t[8],t[9])"
+            + "glp(n,1,(s.q[n]or 0)*2)end end return end "
             + "local n=-1 \(ccBranch)\(noteBranch)"
             + "if n>=0 then s.q[n]=v glp(n,1,v*2)end end"
     }
@@ -79,8 +97,8 @@ enum LEDDeployer {
         var failed = false
     }
 
-    /// Full deployment: per module, write the theme handler (and element
-    /// scripts where templates are known), verify by fetch, then store.
+    /// Full deployment: per module, write the theme handler, remove marked
+    /// color actions from element events, verify by fetch, then store.
     static func deploy(client: GridConfigClient) -> Report {
         var report = Report()
         let modules = client.modules
@@ -95,25 +113,9 @@ enum LEDDeployer {
                 report.lines.append("\(module.name) (\(module.x),\(module.y)): unknown layout — skipped (learn mode still works)")
                 continue
             }
-            var writes: [(element: Int, event: Int, script: String, label: String)] = [
+            let writes: [(element: Int, event: Int, script: String, label: String)] = [
                 (GridConfigClient.systemElement, GridConfigClient.setupEvent, setup, "theme handler"),
             ]
-            if elementRewriteFamilies.contains(module.name),
-               let elements = GridModuleCatalog.elements(hwcfg: module.hwcfg) {
-                for (index, element) in elements.enumerated() {
-                    switch element {
-                    case .potmeter:
-                        writes.append((index, 1, potEventScript, "element \(index)"))
-                    case .button:
-                        writes.append((index, 3, buttonEventScript, "element \(index)"))
-                    default:
-                        break
-                    }
-                }
-            } else {
-                report.lines.append("\(module.name): element color blocks left as-is (no verified template) — colors may need a one-time Grid Editor cleanup")
-            }
-
             for write in writes {
                 let current = client.fetchConfig(module: module, element: write.element, event: write.event)
                 if case .success(let existing) = current, existing == write.script {
@@ -139,6 +141,44 @@ enum LEDDeployer {
                     report.lines.append("✗ \(module.name) \(write.label): verify failed: \(message)")
                     report.failed = true
                     return report
+                }
+            }
+
+            guard let elements = GridModuleCatalog.elements(hwcfg: module.hwcfg) else { continue }
+            for (index, element) in elements.enumerated() {
+                for event in colorEventIDs(for: element) {
+                    let label = "element \(index) event \(event)"
+                    let existing: String
+                    switch client.fetchConfig(module: module, element: index, event: event) {
+                    case .success(let script):
+                        existing = script
+                    case .failure(let message):
+                        report.lines.append("✗ \(module.name) \(label): read failed: \(message) — NOT storing")
+                        report.failed = true
+                        return report
+                    }
+                    let stripped = removingSimpleColor(from: existing)
+                    guard stripped != existing else { continue }
+                    switch client.writeConfig(module: module, element: index, event: event, script: stripped) {
+                    case .failure(let message):
+                        report.lines.append("✗ \(module.name) \(label): \(message)")
+                        report.failed = true
+                        return report
+                    case .success:
+                        wroteAnything = true
+                    }
+                    switch client.fetchConfig(module: module, element: index, event: event) {
+                    case .success(let readBack) where readBack == stripped:
+                        report.lines.append("✓ \(module.name) \(label) color removed + verified")
+                    case .success:
+                        report.lines.append("✗ \(module.name) \(label): read-back mismatch — NOT storing")
+                        report.failed = true
+                        return report
+                    case .failure(let message):
+                        report.lines.append("✗ \(module.name) \(label): verify failed: \(message)")
+                        report.failed = true
+                        return report
+                    }
                 }
             }
         }

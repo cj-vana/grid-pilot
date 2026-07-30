@@ -21,6 +21,7 @@ enum GridElementType {
     case encoder
     case endless
     case touch
+    case lcd
 }
 
 enum GridModuleCatalog {
@@ -43,9 +44,9 @@ enum GridModuleCatalog {
         families[hwcfg] ?? "Grid(\(hwcfg))"
     }
 
-    /// Element index → type, for control-map generation. Derived from the
-    /// protocol repo's moduleElements tables; families we haven't verified on
-    /// hardware return nil and fall back to learn mode.
+    /// Element index → type. Derived from the protocol repo's
+    /// moduleElements tables; LCD entries stay in the array so subsequent
+    /// controls retain their real hardware indices.
     static func elements(hwcfg: Int) -> [GridElementType]? {
         switch name(hwcfg: hwcfg) {
         case "PO16": return Array(repeating: .potmeter, count: 16)
@@ -53,7 +54,19 @@ enum GridModuleCatalog {
         case "EN16": return Array(repeating: .encoder, count: 16)
         case "EF44": return Array(repeating: .encoder, count: 4) + Array(repeating: .potmeter, count: 4)
         case "PBF4": return Array(repeating: .potmeter, count: 8) + Array(repeating: .button, count: 4)
+        case "PB44": return Array(repeating: .potmeter, count: 8) + Array(repeating: .button, count: 8)
+        case "TEK1":
+            return Array(repeating: .button, count: 8) + [.endless]
+                + Array(repeating: .button, count: 4) + [.lcd]
         case "TEK2": return Array(repeating: .button, count: 8) + Array(repeating: .endless, count: 2)
+        case "VSN1L", "VSN1R":
+            return Array(repeating: .button, count: 8) + [.endless]
+                + Array(repeating: .button, count: 4) + [.lcd]
+        case "VSN2":
+            return Array(repeating: .button, count: 12) + [.lcd]
+                + Array(repeating: .button, count: 4) + [.lcd]
+        case "OCTV": return Array(repeating: .encoder, count: 8) + Array(repeating: .button, count: 13)
+        case "XY": return Array(repeating: .touch, count: 5)
         default: return nil
         }
     }
