@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Fixed TEK2 discovery/map generation: its hardware indices are eight buttons
+  followed by two endless encoders. The reversed layout caused controls to
+  collide with the default PBF4 map and be silently omitted.
+- Fixed TEK2 LED feedback ranges so button notes and encoder CCs target their
+  actual element indices.
+
 ## 0.1.0 (2026-07-23)
 
 Initial release.

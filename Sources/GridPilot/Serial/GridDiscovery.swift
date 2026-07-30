@@ -53,7 +53,7 @@ enum GridModuleCatalog {
         case "EN16": return Array(repeating: .encoder, count: 16)
         case "EF44": return Array(repeating: .encoder, count: 4) + Array(repeating: .potmeter, count: 4)
         case "PBF4": return Array(repeating: .potmeter, count: 8) + Array(repeating: .button, count: 4)
-        case "TEK2": return Array(repeating: .endless, count: 2) + Array(repeating: .button, count: 8)
+        case "TEK2": return Array(repeating: .button, count: 8) + Array(repeating: .endless, count: 2)
         default: return nil
         }
     }

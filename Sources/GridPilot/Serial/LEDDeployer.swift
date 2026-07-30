@@ -26,18 +26,21 @@ enum LEDDeployer {
         // button). c//4 isolates the row, so the guard survives page flips.
         let row = ((module.y % 4) + 4) % 4
 
-        // Contiguous button range (all catalog families keep buttons at the tail).
-        let firstButton = elements.firstIndex(of: .button)
-        let ccEnd = base + (firstButton ?? count) - 1
-        let ccBranch = firstButton == 0
-            ? ""
-            : "if c//4==\(row) and m==176 and p>=\(base) and p<=\(ccEnd) then n=p-\(base) end "
-        var noteBranch = ""
-        if let firstButton {
-            let noteStart = base + firstButton
-            let noteEnd = base + count - 1
-            noteBranch = "if c//4==\(row) and(m==144 or m==128)and p>=\(noteStart) and p<=\(noteEnd) then n=p-\(base) if m==128 then v=0 end end "
-        }
+        let ccRanges = contiguousRanges(
+            elements.indices.filter {
+                switch elements[$0] {
+                case .potmeter, .encoder, .endless: return true
+                case .button, .touch: return false
+                }
+            }
+        )
+        let buttonRanges = contiguousRanges(elements.indices.filter { elements[$0] == .button })
+        let ccBranch = ccRanges.map { range in
+            "if c//4==\(row) and m==176 and p>=\(base + range.lowerBound) and p<=\(base + range.upperBound) then n=p-\(base) end "
+        }.joined()
+        let noteBranch = buttonRanges.map { range in
+            "if c//4==\(row) and(m==144 or m==128)and p>=\(base + range.lowerBound) and p<=\(base + range.upperBound) then n=p-\(base) if m==128 then v=0 end end "
+        }.joined()
 
         // The renderer re-blends gln/gld/glx by phase every frame, so setting
         // anchors + phase is the whole job. Never add glc here: firmware's
@@ -51,6 +54,24 @@ enum LEDDeployer {
             + "glp(n,1,(s.q[n]or 0)*2)end return end "
             + "local n=-1 \(ccBranch)\(noteBranch)"
             + "if n>=0 then s.q[n]=v glp(n,1,v*2)end end"
+    }
+
+    private static func contiguousRanges(_ indices: [Int]) -> [ClosedRange<Int>] {
+        guard let first = indices.first else { return [] }
+        var ranges: [ClosedRange<Int>] = []
+        var start = first
+        var end = first
+        for index in indices.dropFirst() {
+            if index == end + 1 {
+                end = index
+            } else {
+                ranges.append(start...end)
+                start = index
+                end = index
+            }
+        }
+        ranges.append(start...end)
+        return ranges
     }
 
     struct Report {

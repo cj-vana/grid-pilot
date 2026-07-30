@@ -125,6 +125,14 @@ final class DeployerTests: XCTestCase {
         XCTAssertTrue(script.contains("p>=32 and p<=47"), script)
     }
 
+    func testTEK2RoutesButtonsBeforeEndlessEncoders() throws {
+        let module = GridModule(x: 0, y: 0, hwcfg: 27, firmware: (1, 5, 5), lastSeen: Date())
+        let script = try XCTUnwrap(LEDDeployer.systemSetupScript(for: module))
+        XCTAssertTrue(script.contains("m==176 and p>=40 and p<=41"), "endless encoders are elements 8-9")
+        XCTAssertTrue(script.contains("p>=32 and p<=39"), "buttons are elements 0-7")
+        XCTAssertLessThanOrEqual(script.utf8.count, GridConfigClient.maxActionLength)
+    }
+
     func testUnknownModuleReturnsNil() {
         let module = GridModule(x: 0, y: 0, hwcfg: 161, firmware: (1, 5, 5), lastSeen: Date())
         XCTAssertNil(LEDDeployer.systemSetupScript(for: module))
@@ -157,6 +165,19 @@ final class MapGeneratorTests: XCTestCase {
         XCTAssertEqual(controls["M1,-1-E1"], ControlDef(cc: 48, kind: .continuous, type: .cc, channel: 12))
         XCTAssertEqual(controls["M1,-1-E16"], ControlDef(cc: 63, kind: .continuous, type: .cc, channel: 12))
         XCTAssertEqual(controls.count, 12 + 16)
+    }
+
+    func testHeadTEK2UsesHardwareElementOrderWithoutDefaultMapCollisions() {
+        let tek2 = GridModule(x: 0, y: 0, hwcfg: 27, firmware: (1, 5, 5), lastSeen: Date())
+        let controls = MapGenerator.controls(for: [tek2])
+        XCTAssertEqual(controls["M0,0-B1"], ControlDef(cc: 32, kind: .button, type: .note, channel: 0))
+        XCTAssertEqual(controls["M0,0-B8"], ControlDef(cc: 39, kind: .button, type: .note, channel: 0))
+        XCTAssertEqual(controls["M0,0-E1"], ControlDef(cc: 40, kind: .continuous, type: .cc, channel: 0))
+        XCTAssertEqual(controls["M0,0-E2"], ControlDef(cc: 41, kind: .continuous, type: .cc, channel: 0))
+        XCTAssertEqual(controls.count, 10)
+
+        let (_, added) = MapGenerator.merge(into: .default, modules: [tek2])
+        XCTAssertEqual(added.count, 10, "TEK2 controls must not collide with the default PBF4 map")
     }
 
     func testMergePreservesExistingAndReportsAdded() {
