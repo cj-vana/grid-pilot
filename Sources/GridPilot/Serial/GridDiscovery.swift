@@ -96,6 +96,7 @@ extension GridProtocol {
         var major: Int
         var minor: Int
         var patch: Int
+        var activePage: Int?
     }
 
     /// Parses a validated frame body; returns nil if it isn't a heartbeat.
@@ -118,6 +119,28 @@ extension GridProtocol {
         guard let code = classHex(1, 3), code == classHeartbeat else { return nil }
         guard let hwcfg = classHex(7, 2), hwcfg != 255,   // 255 = another host
               let major = classHex(9, 2), let minor = classHex(11, 2), let patch = classHex(13, 2) else { return nil }
-        return Heartbeat(x: sx - 127, y: sy - 127, hwcfg: hwcfg, major: major, minor: minor, patch: patch)
+        // The USB head (heartbeat type 1) appends a PAGEACTIVE report to
+        // every heartbeat. Chained modules omit it because the whole chain
+        // negotiates one active page from the head.
+        var activePage: Int?
+        var searchStart = stxIndex + 1
+        while searchStart < body.count,
+              let section = body[searchStart...].firstIndex(of: STX) {
+            if section + 7 <= body.count,
+               let sectionCode = hexInt((section + 1)..<(section + 4)),
+               let instruction = hexInt((section + 4)..<(section + 5)),
+               sectionCode == 0x030,
+               instruction == 0xD {
+                activePage = hexInt((section + 5)..<(section + 7))
+                break
+            }
+            searchStart = section + 1
+        }
+
+        return Heartbeat(
+            x: sx - 127, y: sy - 127, hwcfg: hwcfg,
+            major: major, minor: minor, patch: patch,
+            activePage: activePage
+        )
     }
 }

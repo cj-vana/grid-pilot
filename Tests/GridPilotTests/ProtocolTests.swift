@@ -93,7 +93,41 @@ final class ProtocolTests: XCTestCase {
         XCTAssertEqual(heartbeat.hwcfg, 67)
         XCTAssertEqual(heartbeat.major, 1)
         XCTAssertEqual(heartbeat.patch, 5)
+        XCTAssertNil(heartbeat.activePage)
         XCTAssertEqual(GridModuleCatalog.name(hwcfg: 67), "PBF4")
+    }
+
+    func testUSBHeadHeartbeatReportsActivePage() {
+        var heartbeatParams: [UInt8] = []
+        heartbeatParams += GridProtocol.hexParam(1, width: 2)  // USB head
+        heartbeatParams += GridProtocol.hexParam(27, width: 2) // TEK2
+        heartbeatParams += GridProtocol.hexParam(1, width: 2)
+        heartbeatParams += GridProtocol.hexParam(5, width: 2)
+        heartbeatParams += GridProtocol.hexParam(5, width: 2)
+        heartbeatParams += GridProtocol.hexParam(3, width: 2)  // port state
+        heartbeatParams += GridProtocol.hexParam(0, width: 2)  // GC count
+        let heartbeatSection = GridProtocol.classSection(
+            code: GridProtocol.classHeartbeat,
+            instruction: GridProtocol.instrExecute,
+            params: heartbeatParams
+        )
+        let pageSection = GridProtocol.classSection(
+            code: 0x030,
+            instruction: GridConfigClient.instrReport,
+            params: GridProtocol.hexParam(2, width: 2)
+        )
+        let packet = GridProtocol.packet(
+            id: 10, session: 3, to: .global,
+            classSection: heartbeatSection + pageSection
+        )
+
+        var splitter = GridProtocol.FrameSplitter()
+        let frames = splitter.ingest(packet)
+        let body = frames.first.flatMap(GridProtocol.validateFrame)
+        let heartbeat = body.flatMap(GridProtocol.decodeHeartbeat)
+
+        XCTAssertEqual(heartbeat?.hwcfg, 27)
+        XCTAssertEqual(heartbeat?.activePage, 2)
     }
 }
 

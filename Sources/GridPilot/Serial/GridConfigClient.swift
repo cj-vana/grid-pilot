@@ -20,6 +20,7 @@ final class GridConfigClient {
     private var nextID: UInt8 = 1
     private var heartbeatTimer: Timer?
     private(set) var modules: [GridModule] = []
+    private(set) var activePage = 0
     var onModulesChanged: (([GridModule]) -> Void)?
 
     /// Pending request waiting for a semantically-matching reply.
@@ -89,6 +90,9 @@ final class GridConfigClient {
     }
 
     private func noteModule(_ heartbeat: GridProtocol.Heartbeat) {
+        if let page = heartbeat.activePage {
+            activePage = page
+        }
         let module = GridModule(
             x: heartbeat.x, y: heartbeat.y, hwcfg: heartbeat.hwcfg,
             firmware: (heartbeat.major, heartbeat.minor, heartbeat.patch),
@@ -161,7 +165,8 @@ final class GridConfigClient {
         }
     }
 
-    func writeConfig(module: GridModule, element: Int, event: Int, script: String, page: Int = 0) -> Result<Void, String> {
+    func writeConfig(module: GridModule, element: Int, event: Int, script: String, page: Int? = nil) -> Result<Void, String> {
+        let page = page ?? activePage
         let bytes = Array(script.utf8)
         guard bytes.count <= Self.maxActionLength else {
             return .failure("script is \(bytes.count) bytes; module limit is \(Self.maxActionLength)")
@@ -196,7 +201,8 @@ final class GridConfigClient {
         return .failure("unreachable")
     }
 
-    func fetchConfig(module: GridModule, element: Int, event: Int, page: Int = 0) -> Result<String, String> {
+    func fetchConfig(module: GridModule, element: Int, event: Int, page: Int? = nil) -> Result<String, String> {
+        let page = page ?? activePage
         var params: [UInt8] = []
         params += GridProtocol.hexParam(1, width: 2)
         params += GridProtocol.hexParam(5, width: 2)

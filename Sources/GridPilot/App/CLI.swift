@@ -141,7 +141,7 @@ enum CLI {
             print("✗ port opened but no module heartbeats — is the Grid connected?")
             return 1
         }
-        print("discovered \(modules.count) module\(modules.count == 1 ? "" : "s"):")
+        print("discovered \(modules.count) module\(modules.count == 1 ? "" : "s") on page \(client.activePage):")
         for module in modules {
             let fw = "\(module.firmware.major).\(module.firmware.minor).\(module.firmware.patch)"
             let head = module.x == 0 && module.y == 0 ? "  [USB head]" : ""
